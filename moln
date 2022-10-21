@@ -1,0 +1,687 @@
+#!/bin/bash
+#
+# Copyright (C) 2022 Fredrik Öhrström (gpl-3.0-or-later)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+MOLN=$(realpath $0)
+verbose=false
+
+# Define groups of commands #################################
+
+cmds_Install_Tools="install"
+cmds_Basic_Information="whoami"
+cmds_Start_Web_Console="console"
+cmds_Users="create-user create-policy print-default-user-policy attach-user-policy list-attached-user-policies"
+cmds_Roles="print-default-role-policy create-role attach-role-policy list-attached-role-policies list-roles assume-role"
+cmds_Policies="list-policies"
+cmds_Groups="list-groups-for-user list-attached-group-policies"
+cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
+cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
+cmds_Public_IPs="allocate-ip list-ips bind-ip"
+cmds_Security_Groups="list-security-groups list-regions"
+cmds_Servers="create-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer"
+cmds_Lambdas="list-lambda-layers list-lambda-functions"
+cmds_Buckets="list-buckets list-bucket-content"
+cmds_Streams="list-streams"
+cmds_Costs="list-costs"
+cmds_Apis="list-api-domains"
+
+##############################################################
+normal=$(printf '\033[0m')
+yellow=$(printf '\033[33m')
+blue=$(printf '\033[34m')
+red=$(printf '\033[31m')
+green=$(printf '\033[32m')
+
+NA="${red}NA${normal}"
+
+function getTag
+{
+    local NAME="$1"
+    local JSON="$2"
+    local HASTAGS=$(echo "$JSON" | jq -jr '.Tags')
+    if [ "$HASTAGS" = "null" ]
+    then
+        # Tags does not exist at all.
+        echo "$NA"
+    else
+        local VAL=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "'$NAME'") | .Value)')
+        if [ -n "$VAL" ]
+        then
+            echo "$VAL"
+        else
+            echo "$NA"
+        fi
+    fi
+}
+# Define the actual commmands ####################################
+# Look for Main entry far below where the actual execution starts.
+##################################################################
+
+function duration_since
+{
+    # Take a timestamp as an argument and output: 4m (for 4minutes) 4h (for 4 hours) 8d (for 8 days)
+    TIMESTAMP="$1"
+    THEN=$(date -d "$TIMESTAMP" "+%s")
+    NOW=$(date "+%s")
+    let DIFF=($NOW-$THEN)/86400
+    if [ "$DIFF" = "0" ]
+    then
+        let DIFF=($NOW-$THEN)/3600
+        if [ "$DIFF" = "0" ]
+        then
+            let DIFF=($NOW-$THEN)/60
+            echo "${DIFF}m"
+        else
+            echo "${DIFF}h"
+        fi
+    else
+        echo "${DIFF}d"
+    fi
+}
+
+## whoami ########################################################
+
+function cmd_aws_whoami {
+    echo "# AWS"
+    aws sts get-caller-identity
+}
+
+function cmd_azure_whoami {
+    echo "# Azure"
+    az account list
+}
+
+function cmd_gcloud_whoami {
+    echo "# Gcloud"
+    gcloud config list
+}
+
+function cmd_install_pre {
+    mkdir -p $HOME/opt
+    mkdir -p $HOME/bin
+}
+
+############################################################################################
+#
+# Roles
+#
+############################################################################################
+
+function cmd_aws_list_roles
+{
+    ROLE=$1
+    aws iam list-roles --query  "Roles[].Arn"
+}
+
+function cmd_aws_assume_role
+{
+    ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT}:role/$1
+    SESSION_NAME=$2
+    if [ -z "$SESSION_NAME" ] || [ -z "$ROLE_ARN" ]
+    then
+        echo "Usage: moln aws assume-role <role> <session_name>"
+        exit 1
+    fi
+    echo "aws sts assume-role --role-arn $ROLE_ARN --role-session-name $SESSION_NAME > session.token"
+    aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" > session.token
+    ROLE_SESSION_NAME=$(jq .AssumedRoleUser.Arn session.token | tr -d '"' | cut -f 2- -d '/')
+    echo "Role session ${ROLE_SESSION_NAME} expires $(jq .Credentials.Expiration session.token | tr -d '"')"
+    AWS_ACCESS_KEY_ID=$(jq .Credentials.AccessKeyId session.token | tr -d '"') \
+    AWS_SECRET_ACCESS_KEY=$(jq .Credentials.SecretAccessKey session.token | tr -d '"') \
+    AWS_SESSION_TOKEN=$(jq .Credentials.SessionToken session.token | tr -d '"') \
+    bash --rcfile <(echo 'export PS1="${PS1}\[\033[01;31m\]['${ROLE_SESSION_NAME}']\[\033[00m\]\$ "')
+}
+
+############################################################################################
+#
+# Policies
+#
+############################################################################################
+
+function cmd_aws_list_policies
+{
+    POLICY=$1
+    aws iam list-policies --query  "Policies[].Arn"
+}
+
+
+############################################################################################
+#
+# List Costs
+#
+############################################################################################
+
+function cmd_aws_list_costs
+{
+cat > /tmp/filters.json <<EOF
+{
+    "Dimensions": {
+        "Key": "SERVICE",
+        "Values": [
+            "Amazon Elastic Compute Cloud - Compute"
+        ]
+    }
+}
+EOF
+
+aws ce get-cost-and-usage \
+    --time-period Start=2021-12-01,End=2021-12-30 \
+    --metrics "BlendedCost" \
+    --granularity MONTHLY \
+    --filter='{ "Dimensions": { "Key": "SERVICE", "Values": [ "Amazon Elastic Compute Cloud - Compute" ] } }' \
+    --group-by "Type=TAG,Key=Customer" | tee costs.json
+}
+#    --filter file:///tmp/filters.json \
+
+
+############################################################################################
+#
+# List api domains
+#
+############################################################################################
+
+function cmd_list_api_domains_pre
+{
+    printf "DOMAIN\tNAME\t\n"
+}
+
+function cmd_aws_list_api_domains
+{
+    aws apigatewayv2 get-domain-names | jq -r -c '.Items[].DomainName'
+}
+
+function cmd_list_api_domains
+{
+    column -t -s $'\t'
+}
+
+############################################################################################
+#
+# Virtual Private Clouds
+#
+############################################################################################
+
+function summarize_aws_vpc
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        NAME='Not set!'
+        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
+        then
+            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
+        fi
+        ID=$(echo "$JSON" | jq -jr '.VpcId')
+        STATUS=$(echo "$JSON" | jq -jr '.State')
+        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
+        IS_DEFAULT=
+        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
+        then
+            IS_DEFAULT=DEFAULT
+        fi
+
+        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+    fi
+}
+
+function cmd_list_vpcs_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_vpcs
+{
+    aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
+}
+
+function cmd_list_vpcs_post
+{
+    column -t -s $'\t'
+}
+
+function cmd_aws_create_vpc
+{
+    NAME="$1"
+    CUSTOMER="$2"
+    if [ -z "$NAME" ] || [ -z "$CUSTOMER" ]
+    then
+        echo "Usage: moln aws create-vpc Name Customer"
+        exit 1
+    fi
+    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"},{Key=Customer,Value=\"${CUSTOMER}\"}]'"
+    echo "Create AWS vpc $NAME $CUSTOMER $TAGS"
+}
+
+############################################################################################
+#
+# Public IPs (global internet addresses)
+#
+############################################################################################
+
+function summarize_aws_ip
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        echo "$1" | jq .
+    fi
+}
+
+function cmd_list_ips_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_ips
+{
+    aws ec2 describe-addresses | jq -c '.Addresses[]' | while IFS=$"\n" read -r info; do summarize_aws_ip "$info" ; done
+}
+
+function cmd_list_vpcs_ips
+{
+    #    column -t -s $'\t'
+    echo ""
+}
+
+function cmd_aws_allocate_ip
+{
+    NAME="$1"
+    CUSTOMER="$2"
+    if [ -z "$NAME" ] || [ -z "$CUSTOMER" ]
+    then
+        echo "Usage: moln aws create-ip Name Customer"
+        exit 1
+    fi
+    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"},{Key=Customer,Value=\"${CUSTOMER}\"}]'"
+    echo aws ec2 allocate-address
+}
+
+
+############################################################################################
+#
+# Buckets
+#
+############################################################################################
+
+function summarize_aws_bucket
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        NAME='Not set!'
+        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
+        then
+            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
+        fi
+        ID=$(echo "$JSON" | jq -jr '.VpcId')
+        STATUS=$(echo "$JSON" | jq -jr '.State')
+        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
+        IS_DEFAULT=
+        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
+        then
+            IS_DEFAULT=DEFAULT
+        fi
+
+        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+    fi
+}
+
+function cmd_list_vpcs_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_buckets
+{
+    aws s3api list-buckets --output json | jq -c '.Buckets[]' | while IFS=$"\n" read -r info; do summarize_aws_bucket "$info" ; done
+}
+
+function cmd_list_buckets_post
+{
+    column -t -s $'\t'
+}
+
+
+
+############################################################################################
+#
+# Virtual machines
+#
+############################################################################################
+
+function cmd_aws_create_vm
+{
+    NAME=$1
+    aws ec2 run-instances --image-id ami-xxxxxxxx --count 1 --instance-type t2.micro --key-name StockholmServersKeyPair.pem --security-group-ids sg-xxx --subnet-id subnet-xxxx
+}
+
+function cmd_azure_create_vm
+{
+    az vm create --resource-group Norge --name $NAME --image UbuntuLTS --generate-ssh-keys --admin-username azureuser --verbose
+}
+
+function cmd_gcloud_create_vm
+{
+    echo "Not implemented."
+}
+
+function cmd_aws_start_vm
+{
+    NAME=$1
+    aws ec2 start-instances --instance-id $NAME
+}
+
+function cmd_azure_start_vm
+{
+    NAME=$1
+    az vm start --resource-group Norge --name "$NAME" --verbose
+}
+
+function cmd_gcloud_start_vm
+{
+    NAME=$1
+    gcloud compute instances start "$NAME"
+}
+
+function cmd_aws_stop_vm
+{
+    NAME=$1
+    aws ec2 stop-instances --instance-id "$NAME"
+}
+
+function cmd_azure_stop_vm
+{
+    az vm deallocate --resource-group Norge --name "$NAME" --verbose
+}
+
+function cmd_gcloud_stop_vm
+{
+    gcloud compute instances stop "$NAME"
+}
+
+function cmd_destroy_vm
+{
+    PROVIDER=$1
+    NAME=$2
+    case $1 in
+        aws) aws ec2 delete-instances --instance-id $NAME ;;
+        google) ;;
+        azure) ;;
+    esac
+}
+
+function summarize_aws_vm
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ "$verbose" = "true" ]; then echo "$JSON"; fi
+    NAME=$(getTag Name "$JSON")
+    CUSTOMER=$(getTag Customer "$JSON")
+    ID=$(echo "$JSON" | jq -jr '.InstanceId')
+    STATUS=$(echo "$JSON" | jq -jr '.State.Name')
+    TIMESTAMP=$(echo "$JSON" | jq -jr .LaunchTime)
+    SINCE=$(duration_since "$TIMESTAMP")
+    LOCATION=$(echo "$JSON" | jq -r '.Placement.AvailabilityZone')
+    IP=$(echo "$JSON" | jq -r '.PublicIpAddress')
+    TYPE=$(echo "$JSON" | jq -r '.InstanceType')
+    printf "aws\t$CUSTOMER\t$NAME\t$STATUS\t$SINCE\t$LOCATION\t$TYPE\t$ID\t$IP\n"
+}
+
+function summarize_azure_vm
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ "$verbose" = "true" ]; then echo "$JSON"; fi
+    NAME=$(echo "$JSON" | jq -r .name)
+    STATUS=$(echo "$JSON" | jq -r .powerState)
+    TYPE=$(echo "$JSON" | jq -r .hardwareProfile.vmSize)
+    ZONE=$(echo "$JSON" | jq -r .location)
+    TIMESTAMP=$(echo "$JSON" | grep -Po '"creationTimestamp":"\K.*?(?=")')
+    SINCE=$(duration_since "$TIMESTAMP")
+    PUBLIC_IPS=$(echo "$JSON" | jq -r .publicIps)
+    printf "azure\t$NAME\t$STATUS\t$ZONE\t$TYPE\t$PUBLIC\tIPS\n"
+}
+
+function summarize_gcloud_vm {
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ "$verbose" = "true" ]; then echo "$JSON"; fi
+    NAME=$(echo "$JSON" | jq -r .name)
+    STATUS=$(echo "$JSON" | jq -r .status)
+    MACHINETYPE=$(echo "$JSON" | jq -r .machineType)
+    ZONE=$(echo "$MACHINETYPE" | grep -Po 'zones/\K.*?(?=/)')
+    TYPE=$(echo "$MACHINETYPE" | grep -Po 'machineTypes/\K.*')
+    TIMESTAMP=$(echo "$JSON" | jq -r .lastStartTimestamp)
+    SINCE=$(duration_since "$TIMESTAMP")
+    printf "google\t$NAME\t$STATUS\t$SINCE\t$ZONE\t$TYPE\n"
+}
+
+function cmd_list_vms_pre {
+    printf "CLOUD\tCUSTOMER\tNAME\tSTATE\tSINCE\tLOCATION\tTYPE\tID\tIP\n";
+}
+
+function cmd_list_vms_post {
+    column -t -s $'\t'
+}
+
+#aws   WorkDonkey (running) eu-north-1a ami-0b7937aeb16a7eb94 172.31.26.201 public:13.51.86.126
+function cmd_aws_list_vms {
+    aws ec2 describe-instances | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+}
+
+#azure WorkHorse (VM running) norwayeast 18.04-LTS
+#work-lama  europe-north1-a  e2-medium                  10.166.0.2   35.228.250.14  RUNNING
+function cmd_azure_list_vms {
+    az vm list -d | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_azure_vm "$info" ; done
+}
+
+#NAME       ZONE             MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
+function cmd_gcloud_list_vms {
+    gcloud compute instances list --format json | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_gcloud_vm "$info" ; done
+}
+
+function cmd_aws_ssh_to_vm
+{
+    SERVER=$1
+    IP=$(aws ec2 describe-instances | jq -c '.Reservations[].Instances[]'  | jq -r '.PublicIpAddress')
+    ssh -i ~/Nycklar/StockholmServersKeyPair.pem ubuntu@$IP
+}
+
+function cmd_azure_ssh_to_vm
+{
+    SERVER=$1
+    ssh azureuser@$(az vm show -d -g Norge -n $SERVER --query publicIps | tr -d '"')
+}
+
+function cmd_aws_set_vm_customer
+{
+    SERVER="$1"
+    CUSTOMER="$2"
+    aws ec2 create-tags --resources $SERVER --tags 'Key=Customer,Value='$CUSTOMER
+}
+
+
+## install ########################################################
+
+function cmd_aws_install
+{
+    echo "Fetching https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip into $HOME/opt"
+    cd $HOME/opt
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    echo "Unzipping downloaded cli zip..."
+    unzip -q awscliv2.zip
+    echo "Now running: ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin"
+    ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin
+    echo "You can now delete the directory ./aws"
+    echo "Done."
+}
+
+function cmd_gcloud_install {
+    echo "Fetching https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-360.0.0-linux-x86_64.tar.gz"
+    cd $HOME/opt
+    curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-360.0.0-linux-x86_64.tar.gz -o gcsdk.tgz
+    echo "Untaring downloaded cli tgz..."
+    tar xzf gcsdk.tgz
+    echo "Now running: ./google-cloud-sdk/install.sh"
+    ./google-cloud-sdk/install.sh
+    echo "You can now delete ./google-cloud-sdk"
+    echo "Done."
+}
+
+function cmd_azure_install {
+    echo "Removing azure-cli to avoid any old versions in Ubuntu universe 20..." ;
+    sudo apt remove azure-cli -y && sudo apt autoremove -y
+    sudo apt-get update
+    echo "Installing necessary tools to install"
+    sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg
+    echo "Installing microsoft gpg public key."
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+        gpg --dearmor | \
+        sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+    echo "Adding microsoft deb repo to apt."
+    AZ_REPO=$(lsb_release -cs)
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+        sudo tee /etc/apt/sources.list.d/azure-cli.list
+    echo "Installing azure-cli."
+    sudo apt-get update
+    sudo apt-get install azure-cli
+    echo "Done."
+}
+
+#############################################################
+# Main entry ################################################
+#############################################################
+
+# Extract all commands from the above set of command categories by parsing this file.
+all_cmds="$(eval echo $(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/'))"
+
+# Extract all command groups.
+all_cmd_groups="$(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
+
+# Now check the cloud selected, or all of them.
+all_clouds="all aws azure gcloud"
+clouds="aws azure gcloud"
+verbose=false
+
+if [ "$1" = "--available-commands" ]
+then
+    echo "$all_cmds"
+    exit 0
+fi
+
+if [ "$1" = "-v" ]
+then
+    verbose=true
+    shift 1
+fi
+
+if [ "$1" = "--available-clouds" ]
+then
+    echo "$all_clouds"
+    exit 0
+fi
+
+if [ "$1" = "--list-commands" ]
+then
+    for i in $all_cmd_groups
+    do
+        echo "${blue}# ${i#*_} ##################################${normal}"
+        {
+        tmp="$(eval echo $i)"
+        for j in $tmp
+        do
+            info=""
+            for cloud in aws azure gcloud
+            do
+                cmdfunc="cmd_${cloud}_$(echo "$j" | sed 's/-/_/g')"
+                if [ "$(type -t $cmdfunc)" = "function" ]
+                then
+                    info="$info $green$cloud$normal"
+                fi
+            done
+            echo "$j $info"
+        done
+        } | column -t
+        echo
+    done
+    exit 0
+fi
+
+cloud=$1
+cmd=$2
+if [ "$cloud" = "" ] || [ "$cmd" = "" ]
+then
+    echo "Usage: moln {all|aws|azure|gcloud} [command] <args>"
+    exit 0
+fi
+
+if  ! echo -n "$all_clouds" | grep -wq $cloud
+then
+    echo "Error: \"$cloud\" is not a valid cloud provider. ($all_clouds)"
+    exit 1
+fi
+
+# Now check the command choosen.
+
+if  ! echo -n "$all_cmds" | grep -wq $cmd
+then
+    echo "Error: \"$cmd\" is not a valid command."
+    exit 1
+fi
+
+# Now remove the first two arguments.
+shift 2
+
+if [ "$cmd" = "assume-role" ]
+then
+    cmdfunc="cmd_${cloud}_$(echo "$cmd" | sed 's/-/_/g')"
+    eval $cmdfunc "$*"
+    exit $?
+fi
+
+prefunc="cmd_$(echo "$cmd" | sed 's/-/_/g')_pre"
+postfunc="cmd_$(echo "$cmd" | sed 's/-/_/g')_post"
+
+if [ ! "$(type -t $prefunc)" = "function" ]
+then
+    prefunc=true
+fi
+
+if [ ! "$(type -t $postfunc)" = "function" ]
+then
+    postfunc=cat
+fi
+
+if [ "$cloud" = "all" ]
+then
+    (
+        eval $prefunc "$*"
+        for i in $clouds
+        do
+            cmdfunc="cmd_${i}_$(echo "$cmd" | sed 's/-/_/g')"
+            eval $cmdfunc "$*"
+        done
+    ) | eval $postfunc "$*"
+else
+    (
+        eval $prefunc "$*"
+        cmdfunc="cmd_${cloud}_$(echo "$cmd" | sed 's/-/_/g')"
+        eval $cmdfunc "$*"
+    ) | eval $postfunc
+fi

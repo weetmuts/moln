@@ -1,0 +1,7 @@
+function _moln_completer() {
+    local WORD=${COMP_WORDS[COMP_CWORD]}
+    local CMDS="$(moln --available-commands) $(moln --available-clouds)"
+    COMPREPLY=($(compgen -W "${CMDS}" -- "${WORD}"))
+}
+
+complete -F _moln_completer moln
