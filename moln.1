@@ -1,0 +1,44 @@
+.TH MOLN 1
+.SH NAME
+moln \- Convenience shell script to work on cloud services.
+
+.SH SYNOPSIS
+.B moln [cloud] [command] {options}
+
+.SH DESCRIPTION
+
+Moln present a uniform api that is implemented using cli commands from different
+cloud providers. This can be used to work on multiple cloud providers (aws,gcloud,az)
+using the same commands.
+
+.SH EXAMPLES
+
+.B moln aws install
+Download the aws cli command and put a link to it inside your $HOME/bin directory and put the actual code in $HOME/opt.
+
+.B moln aws whoami
+Show your aws identity and account.
+
+.B moln aws list-vpcs
+Show a list of virtual private clouds.
+
+.SH OPTIONS
+\fB\-d\fR debug with a lot of information
+\fB\-l\fR \fB\--list-commands\fR list all available commands
+\fB\-lc\fR \fB\--list-clouds\fR list all available clouds
+\fB\-v\fR show the underlying cli command
+
+.SH COMMANDS
+\fB\whoami\fR print information about the account your are using.
+
+.SH AUTHOR
+Written by Fredrik Öhrström.
+
+.SH COPYRIGHT
+Copyright \(co 2022 Fredrik Öhrström.
+.br
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+.br
+There is NO WARRANTY, to the extent permitted by law.

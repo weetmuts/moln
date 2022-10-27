@@ -17,6 +17,18 @@
 #
 MOLN=$(realpath $0)
 verbose=false
+debug=false
+
+if [ -z "$AWS_ACCOUNT" ]
+then
+    if [ ! -f $HOME/.config/moln/moln.env ]
+    then
+        mkdir -p $HOME/.config/moln
+        echo "AWS_ACCOUNT=$(aws sts get-caller-identity --output text --query Account)"  >> $HOME/.config/moln/moln.env
+        echo "AWS_DEFAULT_REGION=$(aws configure get region)" >> $HOME/.config/moln/moln.env
+    fi
+    . $HOME/.config/moln/moln.env
+fi
 
 # Define groups of commands #################################
 
@@ -31,7 +43,7 @@ cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
 cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
 cmds_Public_IPs="allocate-ip list-ips bind-ip"
 cmds_Security_Groups="list-security-groups list-regions"
-cmds_Servers="create-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer"
+cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates list-vm-images show-vm-image list-disk-snapshots"
 cmds_Lambdas="list-lambda-layers list-lambda-functions"
 cmds_Buckets="list-buckets list-bucket-content"
 cmds_Streams="list-streams"
@@ -253,6 +265,45 @@ function cmd_list_vpcs_post
     column -t -s $'\t'
 }
 
+function summarize_aws_subnet
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        NAME='Not set!'
+        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
+        then
+            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
+        fi
+        ID=$(echo "$JSON" | jq -jr '.VpcId')
+        STATUS=$(echo "$JSON" | jq -jr '.State')
+        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
+        IS_DEFAULT=
+        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
+        then
+            IS_DEFAULT=DEFAULT
+        fi
+
+        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+    fi
+}
+
+function cmd_list_subnets_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_subnets
+{
+    aws ec2 describe-subnets | jq -c '.Subnets[]' | while IFS=$"\n" read -r info; do summarize_aws_subnet "$info" ; done | sort
+}
+
+function cmd_list_subnets_post
+{
+    column -t -s $'\t'
+}
+
 function cmd_aws_create_vpc
 {
     NAME="$1"
@@ -355,21 +406,113 @@ function cmd_list_buckets_post
     column -t -s $'\t'
 }
 
-
-
 ############################################################################################
 #
 # Virtual machines
 #
 ############################################################################################
 
-function cmd_aws_create_vm
+function cmd_aws_get_vm_id_from_name
 {
     NAME=$1
-    aws ec2 run-instances --image-id ami-xxxxxxxx --count 1 --instance-type t2.micro --key-name StockholmServersKeyPair.pem --security-group-ids sg-xxx --subnet-id subnet-xxxx
+    aws ec2 describe-instances --filters "Name=tag:Name,Values=${NAME}" | jq -r .Reservations[].Instances[].InstanceId
 }
 
-function cmd_azure_create_vm
+function cmd_list_vm_templates_pre
+{
+    printf "CLOUD\tID\tNAME\tCREATION\t\n"
+}
+
+function cmd_list_vm_templates_post
+{
+    column -t -s $'\t'
+}
+
+function summarize_aws_vm_template
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ "$debug" = "true" ]; then echo "$JSON"; fi
+    NAME=$(echo "$JSON" | jq -jr '.LaunchTemplateName')
+    ID=$(echo "$JSON" | jq -jr '.LaunchTemplateId')
+    CREATION=$(echo "$JSON" | jq -jr '.CreateTime')
+    printf "aws\t$ID\t$NAME\t$CREATION\t\n"
+}
+
+function cmd_aws_list_vm_templates
+{
+    CMD="aws ec2 describe-launch-templates"
+
+    if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
+    eval "$CMD" | jq -c '.LaunchTemplates[]' | while IFS=$"\n" read -r info; do summarize_aws_vm_template "$info" ; done | sort -k3
+}
+
+function cmd_list_vm_images_pre
+{
+    printf "CLOUD\tID\tCREATION\tNAME\tDESCRIPTION\tDEPRECATION\t\n"
+}
+
+function cmd_list_vm_images_post
+{
+    column -t -s $'\t'
+}
+
+function summarize_aws_vm_image
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ "$debug" = "true" ]; then echo "$JSON"; fi
+    NAME=$(echo "$JSON" | jq -jr '.Name')
+    ID=$(echo "$JSON" | jq -jr '.ImageId')
+    CREATION=$(echo "$JSON" | jq -jr '.CreationDate')
+    DEPRECATION=$(echo "$JSON" | jq -jr '.DeprecationTime')
+    DESCRIPTION=$(echo "$JSON" | jq -jr '.Description')
+    printf "aws\t$ID\t$CREATION\t$NAME\t$DESCRIPTION\t$DEPRECATION\t\n"
+}
+
+function cmd_aws_list_vm_images
+{
+    OS=$1
+    VERSION=$2
+    ARCH=$3
+
+    if [ -z "$OS" ]; then echo "You have to specify an os! (e.g. ubuntu RHEL debian)" ; exit 1; fi;
+    if [ -z "$VERSION" ]; then echo "You have to specify a version! (e.g. 22.04 8.6.0 11)" ; exit 1; fi;
+    if [ -z "$ARCH" ]; then ARCH="x86_64"; fi
+
+    CMD="aws ec2 describe-images \
+            --owners self amazon \
+            --filters \"Name=architecture,Values=${ARCH}\" \"Name=name,Values=*${OS}*${VERSION}*\" \"Name=root-device-type,Values=ebs\" "
+#            --query 'Images[*].[ImageId,CreationDate,Name,Description,DeprecationTime]' --output text \
+#            | sort -k2 -r \
+#            | head -n1"
+
+    if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
+    eval "$CMD" | jq -c '.Images[]' | while IFS=$"\n" read -r info; do summarize_aws_vm_image "$info" ; done | sort -k3
+}
+
+function cmd_aws_show_vm_image
+{
+    IMAGE=$1
+
+    aws ec2 describe-images \
+        --image-ids ${IMAGE}
+}
+
+function cmd_aws_create_vm_from_template
+{
+    NAME=$1
+    TEMPLATE_NAME=$2
+
+    CMD="aws ec2 run-instances \
+         --launch-template LaunchTemplateName=${TEMPLATE_NAME} \
+         --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]\" "
+
+    if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
+    eval "$CMD" > created_${NAME}.json
+}
+
+function cmd_azure_create_vm_from_template
 {
     az vm create --resource-group Norge --name $NAME --image UbuntuLTS --generate-ssh-keys --admin-username azureuser --verbose
 }
@@ -413,15 +556,26 @@ function cmd_gcloud_stop_vm
     gcloud compute instances stop "$NAME"
 }
 
-function cmd_destroy_vm
+function cmd_aws_destroy_vm
 {
-    PROVIDER=$1
-    NAME=$2
-    case $1 in
-        aws) aws ec2 delete-instances --instance-id $NAME ;;
-        google) ;;
-        azure) ;;
-    esac
+    NAME=$1
+
+    ID=$(cmd_aws_get_vm_id_from_name $NAME)
+
+    CMD="aws ec2 terminate-instances --instance-ids $ID"
+
+    echo "Deleting vm ----------------"
+    cmd_aws_show_vm $ID
+    echo "----------------------------"
+    echo
+    echo "Type \"delete $ID\" to delete vm."
+    read d n
+    if [ "$d" != "delete" ] || [ "$n" != "$ID" ]
+    then
+        echo "Nothing deleted."
+        exit 1
+    fi
+    eval "$CMD"
 }
 
 function summarize_aws_vm
@@ -436,8 +590,12 @@ function summarize_aws_vm
     SINCE=$(duration_since "$TIMESTAMP")
     LOCATION=$(echo "$JSON" | jq -r '.Placement.AvailabilityZone')
     IP=$(echo "$JSON" | jq -r '.PublicIpAddress')
+    PIP=$(echo "$JSON" | jq -r '.PrivateIpAddress')
     TYPE=$(echo "$JSON" | jq -r '.InstanceType')
-    printf "aws\t$NAME\t$STATUS\t$SINCE\t$LOCATION\t$TYPE\t$ID\t$IP\n"
+
+    if [ "$IP" = "null" ]; then IP="" ; fi
+
+    printf "aws\t$NAME\t$STATUS\t$SINCE\t$LOCATION\t$TYPE\t$ID\t$PIP\t$IP\n"
 }
 
 function summarize_azure_vm
@@ -470,25 +628,31 @@ function summarize_gcloud_vm {
 }
 
 function cmd_list_vms_pre {
-    printf "CLOUD\tNAME\tSTATE\tSINCE\tLOCATION\tTYPE\tID\tIP\n";
+    printf "CLOUD\tNAME\tSTATE\tSINCE\tLOCATION\tTYPE\tID\tIP\t\n";
 }
 
 function cmd_list_vms_post {
     column -t -s $'\t'
 }
 
-#aws   WorkDonkey (running) eu-north-1a ami-0b7937aeb16a7eb94 172.31.26.201 public:13.51.86.126
+function cmd_aws_show_vm {
+    ID=$1
+    if [[ $ID != i-* ]]
+    then
+        # Is a name, lookup the id.
+        ID=$(cmd_aws_get_vm_id_from_name $ID)
+    fi
+    aws ec2 describe-instances --instance-id=$ID | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+}
+
 function cmd_aws_list_vms {
     aws ec2 describe-instances | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
 }
 
-#azure WorkHorse (VM running) norwayeast 18.04-LTS
-#work-lama  europe-north1-a  e2-medium                  10.166.0.2   35.228.250.14  RUNNING
 function cmd_azure_list_vms {
     az vm list -d | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_azure_vm "$info" ; done
 }
 
-#NAME       ZONE             MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
 function cmd_gcloud_list_vms {
     gcloud compute instances list --format json | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_gcloud_vm "$info" ; done
 }
@@ -576,22 +740,29 @@ all_clouds="all aws azure gcloud"
 clouds="aws azure gcloud"
 verbose=false
 
-if [ "$1" = "--available-commands" ]
+if [ "$1" = "-l" ] || [ "$1" = "--list-commands" ]
 then
     echo "$all_cmds"
     exit 0
 fi
 
-if [ "$1" = "-v" ]
+if [ "$1" = "-lc" ] || [ "$1" = "--list-clouds" ]
+then
+    echo "$all_clouds"
+    exit 0
+fi
+
+if [ "$1" = "-v" ] || [ "$1" = "--verbose" ]
 then
     verbose=true
     shift 1
 fi
 
-if [ "$1" = "--available-clouds" ]
+if [ "$1" = "-d" ] || [ "$1" = "--debug" ]
 then
-    echo "$all_clouds"
-    exit 0
+    verbose=true
+    debug=true
+    shift 1
 fi
 
 if [ "$1" = "--list-commands" ]
@@ -624,7 +795,7 @@ cloud=$1
 cmd=$2
 if [ "$cloud" = "" ] || [ "$cmd" = "" ]
 then
-    echo "Usage: moln {all|aws|azure|gcloud} [command] <args>"
+    echo "Usage: moln {all|aws|azure|gcloud} [command] <options> <args>"
     exit 0
 fi
 
