@@ -523,7 +523,7 @@ function cmd_aws_create_vm_from_template
     if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
     eval "$CMD" > created_${NAME}.json
 
-    jq -r .Instances[].PrivateIpAddress created_wmbusmeters-busto.json > created_${NAME}_ip.txt
+    jq -r .Instances[].PrivateIpAddress created_${NAME}.json > created_${NAME}_ip.txt
 
     echo "VM information stored in created_${NAME}.json"
     echo "VM private ip stored in created_${NAME}_ip.txt"
