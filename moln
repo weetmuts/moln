@@ -49,7 +49,7 @@ cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
 cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
 cmds_Public_IPs="allocate-ip list-ips bind-ip"
 cmds_Security_Groups="list-security-groups list-regions"
-cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates list-vm-images show-vm-image list-disk-snapshots"
+cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates show-vm-image list-disk-snapshots"
 cmds_Lambdas="list-lambda-layers list-lambda-functions"
 cmds_Buckets="list-buckets list-bucket-content"
 cmds_Streams="list-streams"
@@ -418,9 +418,15 @@ function cmd_list_buckets_post
 #
 ############################################################################################
 
-function cmd_aws_get_vm_id_from_name
+function cmd_aws_to_vm_id
 {
-    NAME=$1
+    A="$1"
+    if [[ $A == i-* ]]
+    then
+        # The argument is already an id.
+        echo $A
+    fi
+    NAME="$1"
     aws ec2 describe-instances --filters "Name=tag:Name,Values=${NAME}" | jq -r .Reservations[].Instances[].InstanceId
 }
 
@@ -516,6 +522,11 @@ function cmd_aws_create_vm_from_template
 
     if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
     eval "$CMD" > created_${NAME}.json
+
+    jq -r .Instances[].PrivateIpAddress created_wmbusmeters-busto.json > created_${NAME}_ip.txt
+
+    echo "VM information stored in created_${NAME}.json"
+    echo "VM private ip stored in created_${NAME}_ip.txt"
 }
 
 function cmd_azure_create_vm_from_template
@@ -530,8 +541,8 @@ function cmd_gcloud_create_vm
 
 function cmd_aws_start_vm
 {
-    NAME=$1
-    aws ec2 start-instances --instance-id $NAME
+    ID=$(cmd_aws_to_vm_id $1)
+    aws ec2 start-instances --instance-id "$ID"
 }
 
 function cmd_azure_start_vm
@@ -548,8 +559,8 @@ function cmd_gcloud_start_vm
 
 function cmd_aws_stop_vm
 {
-    NAME=$1
-    aws ec2 stop-instances --instance-id "$NAME"
+    ID=$(cmd_aws_to_vm_id $1)
+    aws ec2 stop-instances --instance-id "$ID"
 }
 
 function cmd_azure_stop_vm
@@ -564,9 +575,8 @@ function cmd_gcloud_stop_vm
 
 function cmd_aws_destroy_vm
 {
-    NAME=$1
-
-    ID=$(cmd_aws_get_vm_id_from_name $NAME)
+    # Supply a vm id or a name.
+    ID=$(cmd_aws_to_vm_id $1)
 
     CMD="aws ec2 terminate-instances --instance-ids $ID"
 
@@ -642,12 +652,8 @@ function cmd_list_vms_post {
 }
 
 function cmd_aws_show_vm {
-    ID=$1
-    if [[ $ID != i-* ]]
-    then
-        # Is a name, lookup the id.
-        ID=$(cmd_aws_get_vm_id_from_name $ID)
-    fi
+    ID=$(cmd_aws_tovm_id $1)
+
     aws ec2 describe-instances --instance-id=$ID | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
 }
 
@@ -700,9 +706,9 @@ function cmd_aws_install
 }
 
 function cmd_gcloud_install {
-    echo "Fetching https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-360.0.0-linux-x86_64.tar.gz"
+    echo "Fetching https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz"
     cd $HOME/opt
-    curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-360.0.0-linux-x86_64.tar.gz -o gcsdk.tgz
+    curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz -o gcsdk.tgz
     echo "Untaring downloaded cli tgz..."
     tar xzf gcsdk.tgz
     echo "Now running: ./google-cloud-sdk/install.sh"

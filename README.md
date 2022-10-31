@@ -1,7 +1,11 @@
 # Moln
 
-A bash shell script to handle multiple cloud providers.
-Do `configure && make && sudo make install` to install it in /usr/local/bin and /etc/bash_completion.d.
+A bash shell script to simplify work with multiple cloud
+providers. When you can't remember the cli command for your cloud
+flavour of the day, do `moln aws list-vms` to list your vms.
+
+Do `configure && make && sudo make install` to install it in
+/usr/local/bin and /etc/bash_completion.d.
 
 First lets install the aws cli (and likewise for azure and gcloud).
 ```
@@ -26,15 +30,12 @@ you will see all commands. Type `moln aws list-` and press tab to see
 all list commands for example `moln aws list-roles`
 
 ```json
-moln aws list-roles
-
 [
     "arn:aws:iam::123456789012:role/.",
     "arn:aws:iam::123456789012:role/..",
     "arn:aws:iam::123456789012:role/...",
     "arn:aws:iam::123456789012:role/my_working_role"
 ]
-
 ```
 
 Now you can assume the role in your shell:
