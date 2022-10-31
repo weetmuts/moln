@@ -523,6 +523,13 @@ function cmd_aws_create_vm_from_template
     if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
     eval "$CMD" > created_${NAME}.json
 
+    if [ "$?" != "0" ]
+    then
+        echo "Failed to create $NAME"
+        rm created_${NAME}.json
+        exit 1
+    fi
+
     jq -r .Instances[].PrivateIpAddress created_${NAME}.json > created_${NAME}_ip.txt
 
     echo "VM information stored in created_${NAME}.json"
