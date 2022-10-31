@@ -1,8 +1,16 @@
 # Moln
 
-A bash shell script to simplify work with multiple cloud
-providers. When you can't remember the cli command for your cloud
-flavour of the day, do `moln aws list-vms` to list your vms.
+A bash shell script to simplify work with multiple cloud providers. In
+particular when you can't remember the cli command for your cloud
+flavour of the day.
+
+Do for example `moln aws list-vms` to list your vms in a plain list.
+To also learn the aws cli command for this do: `moln --verbose aws list-vms`
+
+This script focuses on simple use cases. For more advanced use cases
+please learn from the script and/or copy the script content to your
+own code.  You only need to keep the license and attribution to me if
+you copy large parts of this script.
 
 Do `configure && make && sudo make install` to install it in
 /usr/local/bin and /etc/bash_completion.d.
@@ -28,15 +36,6 @@ moln aws list-vps
 Moln has tab completion so just type `moln aws` and press tab and
 you will see all commands. Type `moln aws list-` and press tab to see
 all list commands for example `moln aws list-roles`
-
-```json
-[
-    "arn:aws:iam::123456789012:role/.",
-    "arn:aws:iam::123456789012:role/..",
-    "arn:aws:iam::123456789012:role/...",
-    "arn:aws:iam::123456789012:role/my_working_role"
-]
-```
 
 Now you can assume the role in your shell:
 ```shell
