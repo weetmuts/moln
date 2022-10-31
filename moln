@@ -539,8 +539,7 @@ function cmd_aws_create_vm_from_template
 
     jq -r .Instances[].PrivateIpAddress created_${NAME}.json > created_${NAME}_ip.txt
 
-    echo "VM information stored in created_${NAME}.json"
-    echo "VM private ip stored in created_${NAME}_ip.txt"
+    echo "Successfully created ${NAME} look in ${NAME}.json ${NAME}.ip"
 }
 
 function cmd_azure_create_vm_from_template
