@@ -50,7 +50,7 @@ cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
 cmds_Public_IPs="allocate-ip list-ips bind-ip"
 cmds_Security_Groups="list-security-groups list-regions"
 cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates show-vm-image list-disk-snapshots"
-cmds_Dns="list-hosted-zones list-dns-records add-dns-record remove-dns-record list-domains"
+cmds_Dns="list-hosted-zones list-dns-records upsert-dns-record remove-dns-record list-domains"
 cmds_Lambdas="list-lambda-layers list-lambda-functions"
 cmds_Buckets="list-buckets list-bucket-content"
 cmds_Streams="list-streams"
@@ -754,16 +754,16 @@ function cmd_aws_list_domains
         jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
 }
 
-function cmd_aws_add_dns_record
+function cmd_aws_upsert_dns_record
 {
-    # Usage: moln aws add-dns-record testur.ferrrbarr.com A 10.11.12.13
+    # Usage: moln aws upsert-dns-record testur.ferrrbarr.com A 10.11.12.13
     NAME=$1
     TYPE=$2
     DEST=$3
 
     if [ -z "$NAME" ] || [ -z "$TYPE" ] || [ -z "$DEST" ]
     then
-        echo "Usage: moln aws add-dns-record alfa.beta.com A 1.2.3.4"
+        echo "Usage: moln aws upsert-dns-record alfa.beta.com A 1.2.3.4"
         exit 1
     fi
     # Grab the host name.
