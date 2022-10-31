@@ -50,6 +50,7 @@ cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
 cmds_Public_IPs="allocate-ip list-ips bind-ip"
 cmds_Security_Groups="list-security-groups list-regions"
 cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates show-vm-image list-disk-snapshots"
+cmds_Dns="list-hosted-zones list-dns-records add-dns-record remove-dns-record list-domains"
 cmds_Lambdas="list-lambda-layers list-lambda-functions"
 cmds_Buckets="list-buckets list-bucket-content"
 cmds_Streams="list-streams"
@@ -64,6 +65,12 @@ red=$(printf '\033[31m')
 green=$(printf '\033[32m')
 
 NA="${red}NA${normal}"
+
+function cmd_columnize_post
+{
+    # Default post function when a pre function has been specified.
+    column -t -s $'\t'
+}
 
 function getTag
 {
@@ -696,6 +703,90 @@ function cmd_aws_set_vm_customer
     aws ec2 create-tags --resources $SERVER --tags 'Key=Customer,Value='$CUSTOMER
 }
 
+## DNS ############################################################
+
+function cmd_list_hosted_zones_pre
+{
+    printf "CLOUD\tDOMAIN\tPRIVATE\tID\t\n"
+}
+
+function cmd_aws_list_hosted_zones
+{
+    aws route53 --region us-east-1 list-hosted-zones | \
+        jq -r '.HostedZones[] | [ "aws", .Name, .Config.PrivateZone, .Id ] | join("\t")'
+}
+
+function cmd_list_dns_records_pre
+{
+    printf "CLOUD\tDOMAIN\tTYPE\tTTL\tIP\t\n"
+}
+
+function cmd_aws_list_dns_records
+{
+    DOMAIN=$1
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    aws route53 list-resource-record-sets --hosted-zone-id=${ID} | \
+        jq -r '.ResourceRecordSets[] | [ "aws", .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' \
+        | grep -v "SOA" | grep -v "NS"
+}
+
+function cmd_list_domains_pre
+{
+    printf "CLOUD\tDOMAIN\tAUTO_RENEW\tTRANSFER_LOCK\tEXPIRES\t\n"
+}
+
+function cmd_aws_list_domains
+{
+    aws route53domains --region us-east-1 list-domains | \
+        jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
+}
+
+function cmd_aws_add_dns_record
+{
+    # Usage: moln aws add-dns-record testur.ferrrbarr.com A 10.11.12.13
+    NAME=$1
+    TYPE=$2
+    DEST=$3
+
+    if [ -z "$NAME" ] || [ -z "$TYPE" ] || [ -z "$DEST" ]
+    then
+        echo "Usage: moln aws add-dns-record alfa.beta.com A 1.2.3.4"
+        exit 1
+    fi
+    # Grab the host name.
+    HOST=${NAME%%.*}
+    # Grab everything after the first .
+    DOMAIN=${NAME#*.}
+
+    if [ -z "$DOMAIN" ]
+    then
+        echo "You must have a full host.domain.com specified!"
+        exit 1
+    fi
+
+    FILE=$(mktemp create_record_XXXXXXX.json)
+    cat > $FILE <<EOF
+{
+    "Comment": "CREATE/DELETE/UPSERT a record ",
+    "Changes": [{
+    "Action": "CREATE",
+    "ResourceRecordSet": {
+        "Name": "${NAME}",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "${DEST}"}]
+    }}]
+}
+EOF
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    echo "Adding $HOST $TYPE $DEST to domain $DOMAIN $ID"
+
+    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+}
 
 ## install ########################################################
 
@@ -847,12 +938,21 @@ postfunc="cmd_$(echo "$cmd" | sed 's/-/_/g')_post"
 
 if [ ! "$(type -t $prefunc)" = "function" ]
 then
+    # This is the /bin/true function, not the boolean true.....
     prefunc=true
 fi
 
 if [ ! "$(type -t $postfunc)" = "function" ]
 then
-    postfunc=cat
+    if [ ! "$prefunc" = "true" ]
+    then
+        # The prefunc is set to something, but we have not explicit post.
+        # Then use the default post.
+        postfunc=cmd_columnize_post
+    else
+        # No post, and no pre, then just cat the output.
+        postfunc=cat
+    fi
 fi
 
 if [ "$cloud" = "all" ]
