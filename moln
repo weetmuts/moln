@@ -528,16 +528,16 @@ function cmd_aws_create_vm_from_template
          --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]\" "
 
     if [ "$verbose" = "true" ]; then echo "$CMD" | tr -s ' ' ; fi
-    eval "$CMD" > created_${NAME}.json
+    eval "$CMD" > ${NAME}.json
 
     if [ "$?" != "0" ]
     then
         echo "Failed to create $NAME"
-        rm created_${NAME}.json
+        rm ${NAME}.json
         exit 1
     fi
 
-    jq -r .Instances[].PrivateIpAddress created_${NAME}.json > created_${NAME}_ip.txt
+    jq -r .Instances[].PrivateIpAddress ${NAME}.json > ${NAME}.ip
 
     echo "Successfully created ${NAME} look in ${NAME}.json ${NAME}.ip"
 }
