@@ -589,21 +589,33 @@ function cmd_gcloud_stop_vm
 function cmd_aws_destroy_vm
 {
     # Supply a vm id or a name.
-    ID=$(cmd_aws_to_vm_id $1)
+    NAMEID="$1"
+    YESREALLY=false
+    if [ "$NAMEID" = "--yes-really-destroy-now" ]
+    then
+        NAMEID="$2"
+        YESREALLY=true
+    fi
+    ID=$(cmd_aws_to_vm_id "$NAMEID")
 
     CMD="aws ec2 terminate-instances --instance-ids $ID"
 
     echo "Deleting vm ----------------"
     cmd_aws_show_vm $ID
     echo "----------------------------"
-    echo
-    echo "Type \"delete $ID\" to delete vm."
-    read d n
-    if [ "$d" != "delete" ] || [ "$n" != "$ID" ]
+
+    if [ "$YESREALLY" = "false" ]
     then
-        echo "Nothing deleted."
-        exit 1
+        echo
+        echo "Type \"delete $ID\" to delete vm."
+        read d n
+        if [ "$d" != "delete" ] || [ "$n" != "$ID" ]
+        then
+            echo "Nothing deleted."
+            exit 1
+        fi
     fi
+
     eval "$CMD"
 }
 
@@ -772,7 +784,7 @@ function cmd_aws_add_dns_record
     "Changes": [{
     "Action": "CREATE",
     "ResourceRecordSet": {
-        "Name": "${NAME}",
+        "Name": "${NAME}.",
         "Type": "A",
         "TTL": 300,
         "ResourceRecords": [{ "Value": "${DEST}"}]
@@ -783,6 +795,64 @@ EOF
     ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
 
     echo "Adding $HOST $TYPE $DEST to domain $DOMAIN $ID"
+
+    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+}
+
+function cmd_aws_remove_dns_record
+{
+    # Usage: moln aws remove-dns-record testur.ferrrbarr.com
+    NAME=$1
+
+    if [ -z "$NAME" ]
+    then
+        echo "Usage: moln aws remove-dns-record alfa.beta.com"
+        exit 1
+    fi
+    # Grab the host name.
+    HOST=${NAME%%.*}
+    # Grab everything after the first .
+    DOMAIN=${NAME#*.}
+
+    if [ -z "$DOMAIN" ]
+    then
+        echo "You must have a full host.domain.com specified!"
+        exit 1
+    fi
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    FIELDS=$(aws route53 list-resource-record-sets --hosted-zone-id ${ID} | \
+                 jq -r '.ResourceRecordSets[] | [ .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' | \
+          grep "$NAME")
+
+    NAMEO=$(echo "$FIELDS" | cut -f 1)
+    TYPE=$(echo "$FIELDS" | cut -f 2)
+    TTL=$(echo "$FIELDS" | cut -f 3)
+    DEST=$(echo "$FIELDS" | cut -f 4)
+
+    if [ -z "$NAMEO" ]
+    then
+        echo "No record for $NAME exists!"
+        exit 1
+    fi
+
+    echo "Removing $HOST $TYPE $DEST from domain $DOMAIN $ID"
+
+    FILE=$(mktemp remove_record_XXXXXXX.json)
+    cat > $FILE <<EOF
+{
+    "Comment": "CREATE/DELETE/UPSERT a record ",
+    "Changes": [{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+        "Name": "${NAME}",
+        "Type": "${TYPE}",
+        "TTL": ${TTL},
+        "ResourceRecords": [{ "Value": "${DEST}"}]
+    }}]
+}
+EOF
 
     aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
 }
