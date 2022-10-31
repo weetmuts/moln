@@ -666,7 +666,7 @@ function cmd_list_vms_post {
 }
 
 function cmd_aws_show_vm {
-    ID=$(cmd_aws_tovm_id $1)
+    ID=$(cmd_aws_to_vm_id $1)
 
     aws ec2 describe-instances --instance-id=$ID | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
 }
