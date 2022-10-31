@@ -782,7 +782,7 @@ function cmd_aws_add_dns_record
 {
     "Comment": "CREATE/DELETE/UPSERT a record ",
     "Changes": [{
-    "Action": "CREATE",
+    "Action": "UPSERT",
     "ResourceRecordSet": {
         "Name": "${NAME}.",
         "Type": "A",
