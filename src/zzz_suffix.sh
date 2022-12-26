@@ -38,11 +38,12 @@ then
     shift 1
 fi
 
-if [ "$1" = "--list-commands" ]
+if [ "$1" = "--list-command-coverage" ]
 then
     for i in $all_cmd_groups
     do
-        echo "${blue}# ${i#*_} ##################################${normal}"
+        echo "${blue}##### ${i#*_} ${normal}"
+        echo
         {
         tmp="$(eval echo $i)"
         for j in $tmp
@@ -59,6 +60,28 @@ then
             echo "$j $info"
         done
         } | column -t
+        echo
+    done
+    exit 0
+fi
+
+if [ "$1" = "--list-help" ]
+then
+    for i in $all_cmd_groups
+    do
+        echo "· ${i#*_}"
+        echo
+        tmp="$(eval echo $i)"
+        for j in $tmp
+        do
+            helpfunc="help_$(echo "$j" | sed 's/-/_/g')"
+            if [ "$(type -t $helpfunc)" = "function" ]
+            then
+                echo "\fB$(eval $helpfunc | head -n 1)\fR"
+                echo ".br"
+                eval $helpfunc | tail -n 1
+            fi
+        done
         echo
     done
     exit 0
@@ -125,13 +148,23 @@ then
         for i in $clouds
         do
             cmdfunc="cmd_${i}_$(echo "$cmd" | sed 's/-/_/g')"
-            eval $cmdfunc "$*"
+            if [ "$(type -t $cmdfunc)" = "function" ]
+            then
+                eval $cmdfunc "$*"
+            else
+                echo "Command $cmd is not implemented for provider $i!"  > /dev/stderr
+            fi
         done
     ) | eval $postfunc "$*"
 else
     (
         eval $prefunc "$*"
         cmdfunc="cmd_${cloud}_$(echo "$cmd" | sed 's/-/_/g')"
-        eval $cmdfunc "$*"
+        if [ "$(type -t $cmdfunc)" = "function" ]
+        then
+            eval $cmdfunc "$*"
+        else
+            echo "Command $cmd is not implemented for provider $cloud!" > /dev/stderr
+        fi
     ) | eval $postfunc
 fi

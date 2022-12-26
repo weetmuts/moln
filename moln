@@ -98,6 +98,11 @@ cmds_Basic_Information="whoami"
 
 ## whoami ########################################################
 
+function help_whoami {
+    echo "whoami"
+    echo "Display active account/identity."
+}
+
 function cmd_aws_whoami {
     echo "# AWS"
     aws sts get-caller-identity
@@ -118,43 +123,30 @@ function cmd_gcloud_whoami {
 
 cmds_Buckets="list-buckets list-bucket-content"
 
+function help_list_buckets {
+    echo "list-buckets"
+    echo "List storage buckets, ie aws s3/gcloud storage/azure blobs."
+}
+
+function cmd_list_buckets_pre
+{
+    printf "CLOUD\tNAME\t\n"
+}
+
 function summarize_aws_bucket
 {
     # Expects a compact json on a single line, no extra spaces.
     JSON="$1"
     if [ -n "$JSON" ]
     then
-        NAME='Not set!'
-        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
-        then
-            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
-        fi
-        ID=$(echo "$JSON" | jq -jr '.VpcId')
-        STATUS=$(echo "$JSON" | jq -jr '.State')
-        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
-        IS_DEFAULT=
-        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
-        then
-            IS_DEFAULT=DEFAULT
-        fi
-
-        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+        NAME=$(echo "$JSON" | jq -jr '.Name')
+        printf "aws\t$NAME\t\n"
     fi
-}
-
-function cmd_list_vpcs_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
 }
 
 function cmd_aws_list_buckets
 {
     aws s3api list-buckets --output json | jq -c '.Buckets[]' | while IFS=$"\n" read -r info; do summarize_aws_bucket "$info" ; done
-}
-
-function cmd_list_buckets_post
-{
-    column -t -s $'\t'
 }
 # Connect to a remote cli console for the cloud service. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
 
@@ -847,6 +839,11 @@ function cmd_list_vms_pre {
     printf "CLOUD\tNAME\tSTATE\tSINCE\tLOCATION\tTYPE\tID\tIP\t\n";
 }
 
+function help_list_vms {
+    echo "list-vms"
+    echo "List all available virtual machines."
+}
+
 function cmd_list_vms_post {
     column -t -s $'\t'
 }
@@ -894,6 +891,16 @@ cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
 
 ## vpc ########################################################
 
+function help_list_vpcs {
+    echo "list-vpcs"
+    echo "List virtual private clouds/networks, aka vpc:s and vnets."
+}
+
+function cmd_list_vpcs_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
 function cmd_aws_create_vpc
 {
     NAME="$1"
@@ -930,39 +937,30 @@ function summarize_aws_vpc
     fi
 }
 
-function cmd_list_vpcs_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
-}
 
 function cmd_aws_list_vpcs
 {
     aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
 }
 
-function cmd_list_vpcs_post
+function cmd_aws_list_vpcs
 {
-    column -t -s $'\t'
+    aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
 }
 ###############################################################################
 # Web api part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
 ###############################################################################
 
-cmds_Apis="list-api-domains"
+cmds_WebApis="list-webapi-domains"
 
-function cmd_list_api_domains_pre
+function cmd_list_webapi_domains_pre
 {
     printf "DOMAIN\tNAME\t\n"
 }
 
-function cmd_aws_list_api_domains
+function cmd_aws_list_webapi_domains
 {
     aws apigatewayv2 get-domain-names | jq -r -c '.Items[].DomainName'
-}
-
-function cmd_list_api_domains
-{
-    column -t -s $'\t'
 }
 #############################################################
 # Moln main function entry ##################################
@@ -1004,11 +1002,12 @@ then
     shift 1
 fi
 
-if [ "$1" = "--list-commands" ]
+if [ "$1" = "--list-command-coverage" ]
 then
     for i in $all_cmd_groups
     do
-        echo "${blue}# ${i#*_} ##################################${normal}"
+        echo "${blue}##### ${i#*_} ${normal}"
+        echo
         {
         tmp="$(eval echo $i)"
         for j in $tmp
@@ -1025,6 +1024,28 @@ then
             echo "$j $info"
         done
         } | column -t
+        echo
+    done
+    exit 0
+fi
+
+if [ "$1" = "--list-help" ]
+then
+    for i in $all_cmd_groups
+    do
+        echo "· ${i#*_}"
+        echo
+        tmp="$(eval echo $i)"
+        for j in $tmp
+        do
+            helpfunc="help_$(echo "$j" | sed 's/-/_/g')"
+            if [ "$(type -t $helpfunc)" = "function" ]
+            then
+                echo "\fB$(eval $helpfunc | head -n 1)\fR"
+                echo ".br"
+                eval $helpfunc | tail -n 1
+            fi
+        done
         echo
     done
     exit 0
@@ -1091,13 +1112,23 @@ then
         for i in $clouds
         do
             cmdfunc="cmd_${i}_$(echo "$cmd" | sed 's/-/_/g')"
-            eval $cmdfunc "$*"
+            if [ "$(type -t $cmdfunc)" = "function" ]
+            then
+                eval $cmdfunc "$*"
+            else
+                echo "Command $cmd is not implemented for provider $i!"  > /dev/stderr
+            fi
         done
     ) | eval $postfunc "$*"
 else
     (
         eval $prefunc "$*"
         cmdfunc="cmd_${cloud}_$(echo "$cmd" | sed 's/-/_/g')"
-        eval $cmdfunc "$*"
+        if [ "$(type -t $cmdfunc)" = "function" ]
+        then
+            eval $cmdfunc "$*"
+        else
+            echo "Command $cmd is not implemented for provider $cloud!" > /dev/stderr
+        fi
     ) | eval $postfunc
 fi

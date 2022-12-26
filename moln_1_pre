@@ -41,8 +41,12 @@ Create a subshell, within which you have access to a different role to gain priv
 
 .SH OPTIONS
 \fB\-l\fR \fB\--list-commands\fR list all available commands.
+.br
 \fB\-lc\fR \fB\--list-clouds\fR list all available clouds.
+.br
 \fB\-v\fR verbose will show the underlying cli commands.
+.br
 \fB\-d\fR debug with a lot of information.
+.br
 
 .SH COMMANDS

@@ -9,6 +9,7 @@ moln: $(SOURCES)
 
 moln.1: moln moln_1_pre moln_1_post
 	cp moln_1_pre moln.1
+	GENERATE_MANPAGE=true ./moln --list-help >> moln.1
 	cat moln_1_post >> moln.1
 
 test:

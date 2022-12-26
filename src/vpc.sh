@@ -4,6 +4,16 @@ cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
 
 ## vpc ########################################################
 
+function help_list_vpcs {
+    echo "list-vpcs"
+    echo "List virtual private clouds/networks, aka vpc:s and vnets."
+}
+
+function cmd_list_vpcs_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
 function cmd_aws_create_vpc
 {
     NAME="$1"
@@ -40,17 +50,13 @@ function summarize_aws_vpc
     fi
 }
 
-function cmd_list_vpcs_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
-}
 
 function cmd_aws_list_vpcs
 {
     aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
 }
 
-function cmd_list_vpcs_post
+function cmd_aws_list_vpcs
 {
-    column -t -s $'\t'
+    aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
 }

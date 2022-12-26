@@ -251,6 +251,11 @@ function cmd_list_vms_pre {
     printf "CLOUD\tNAME\tSTATE\tSINCE\tLOCATION\tTYPE\tID\tIP\t\n";
 }
 
+function help_list_vms {
+    echo "list-vms"
+    echo "List all available virtual machines."
+}
+
 function cmd_list_vms_post {
     column -t -s $'\t'
 }

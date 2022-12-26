@@ -4,6 +4,11 @@ cmds_Basic_Information="whoami"
 
 ## whoami ########################################################
 
+function help_whoami {
+    echo "whoami"
+    echo "Display active account/identity."
+}
+
 function cmd_aws_whoami {
     echo "# AWS"
     aws sts get-caller-identity
