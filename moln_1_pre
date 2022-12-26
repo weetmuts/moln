@@ -46,15 +46,3 @@ Create a subshell, within which you have access to a different role to gain priv
 \fB\-d\fR debug with a lot of information.
 
 .SH COMMANDS
-
-.SH AUTHOR
-Written by Fredrik Öhrström.
-
-.SH COPYRIGHT
-Copyright \(co 2022 Fredrik Öhrström.
-.br
-License MIT
-.br
-This is free software: you are free to change and redistribute it.
-.br
-There is NO WARRANTY, to the extent permitted by law.

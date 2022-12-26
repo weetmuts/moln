@@ -36,27 +36,6 @@ then
     . $HOME/.config/moln/moln.env
 fi
 
-# Define groups of commands #################################
-
-cmds_Install_Tools="install"
-cmds_Basic_Information="whoami"
-cmds_Start_Web_Console="console"
-cmds_Users="create-user create-policy print-default-user-policy attach-user-policy list-attached-user-policies"
-cmds_Roles="print-default-role-policy create-role attach-role-policy list-attached-role-policies list-roles assume-role"
-cmds_Policies="list-policies"
-cmds_Groups="list-groups-for-user list-attached-group-policies"
-cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
-cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
-cmds_Public_IPs="allocate-ip list-ips bind-ip"
-cmds_Security_Groups="list-security-groups list-regions"
-cmds_Servers="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates show-vm-image list-disk-snapshots"
-cmds_Dns="list-hosted-zones list-dns-records upsert-dns-record remove-dns-record list-domains"
-cmds_Lambdas="list-lambda-layers list-lambda-functions"
-cmds_Buckets="list-buckets list-bucket-content"
-cmds_Streams="list-streams"
-cmds_Costs="list-costs"
-cmds_Apis="list-api-domains"
-
 ##############################################################
 normal=$(printf '\033[0m')
 yellow=$(printf '\033[33m')
@@ -91,9 +70,6 @@ function getTag
         fi
     fi
 }
-# Define the actual commmands ####################################
-# Look for Main entry far below where the actual execution starts.
-##################################################################
 
 function duration_since
 {
@@ -116,6 +92,9 @@ function duration_since
         echo "${DIFF}d"
     fi
 }
+# Basic information part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Basic_Information="whoami"
 
 ## whoami ########################################################
 
@@ -133,252 +112,11 @@ function cmd_gcloud_whoami {
     echo "# Gcloud"
     gcloud config list
 }
+###############################################################################
+# Buckets part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
+###############################################################################
 
-function cmd_install_pre {
-    mkdir -p $HOME/opt
-    mkdir -p $HOME/bin
-}
-
-############################################################################################
-#
-# Roles
-#
-############################################################################################
-
-function cmd_aws_list_roles
-{
-    ROLE=$1
-    aws iam list-roles --query  "Roles[].Arn"
-}
-
-function cmd_aws_assume_role
-{
-    ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT}:role/$1
-    SESSION_NAME=$2
-    if [ -z "$SESSION_NAME" ] || [ -z "$ROLE_ARN" ]
-    then
-        echo "Usage: moln aws assume-role <role> <session_name>"
-        exit 1
-    fi
-    echo "aws sts assume-role --role-arn $ROLE_ARN --role-session-name $SESSION_NAME > session.token"
-    aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" > session.token
-    ROLE_SESSION_NAME=$(jq .AssumedRoleUser.Arn session.token | tr -d '"' | cut -f 2- -d '/')
-    echo "Role session ${ROLE_SESSION_NAME} expires $(jq .Credentials.Expiration session.token | tr -d '"')"
-    AWS_ACCESS_KEY_ID=$(jq .Credentials.AccessKeyId session.token | tr -d '"') \
-    AWS_SECRET_ACCESS_KEY=$(jq .Credentials.SecretAccessKey session.token | tr -d '"') \
-    AWS_SESSION_TOKEN=$(jq .Credentials.SessionToken session.token | tr -d '"') \
-    bash --rcfile <(echo 'export PS1="${PS1}\[\033[01;31m\]['${ROLE_SESSION_NAME}']\[\033[00m\]\$ "')
-}
-
-############################################################################################
-#
-# Policies
-#
-############################################################################################
-
-function cmd_aws_list_policies
-{
-    POLICY=$1
-    aws iam list-policies --query  "Policies[].Arn"
-}
-
-
-############################################################################################
-#
-# List Costs
-#
-############################################################################################
-
-function cmd_aws_list_costs
-{
-cat > /tmp/filters.json <<EOF
-{
-    "Dimensions": {
-        "Key": "SERVICE",
-        "Values": [
-            "Amazon Elastic Compute Cloud - Compute"
-        ]
-    }
-}
-EOF
-
-aws ce get-cost-and-usage \
-    --time-period Start=2021-12-01,End=2021-12-30 \
-    --metrics "BlendedCost" \
-    --granularity MONTHLY \
-    --filter='{ "Dimensions": { "Key": "SERVICE", "Values": [ "Amazon Elastic Compute Cloud - Compute" ] } }' \
-    --group-by "Type=TAG,Key=Customer" | tee costs.json
-}
-#    --filter file:///tmp/filters.json \
-
-
-############################################################################################
-#
-# List api domains
-#
-############################################################################################
-
-function cmd_list_api_domains_pre
-{
-    printf "DOMAIN\tNAME\t\n"
-}
-
-function cmd_aws_list_api_domains
-{
-    aws apigatewayv2 get-domain-names | jq -r -c '.Items[].DomainName'
-}
-
-function cmd_list_api_domains
-{
-    column -t -s $'\t'
-}
-
-############################################################################################
-#
-# Virtual Private Clouds
-#
-############################################################################################
-
-function summarize_aws_vpc
-{
-    # Expects a compact json on a single line, no extra spaces.
-    JSON="$1"
-    if [ -n "$JSON" ]
-    then
-        NAME='Not set!'
-        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
-        then
-            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
-        fi
-        ID=$(echo "$JSON" | jq -jr '.VpcId')
-        STATUS=$(echo "$JSON" | jq -jr '.State')
-        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
-        IS_DEFAULT=
-        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
-        then
-            IS_DEFAULT=DEFAULT
-        fi
-
-        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
-    fi
-}
-
-function cmd_list_vpcs_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
-}
-
-function cmd_aws_list_vpcs
-{
-    aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
-}
-
-function cmd_list_vpcs_post
-{
-    column -t -s $'\t'
-}
-
-function summarize_aws_subnet
-{
-    # Expects a compact json on a single line, no extra spaces.
-    JSON="$1"
-    if [ -n "$JSON" ]
-    then
-        NAME='Not set!'
-        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
-        then
-            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
-        fi
-        ID=$(echo "$JSON" | jq -jr '.VpcId')
-        STATUS=$(echo "$JSON" | jq -jr '.State')
-        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
-        IS_DEFAULT=
-        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
-        then
-            IS_DEFAULT=DEFAULT
-        fi
-
-        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
-    fi
-}
-
-function cmd_list_subnets_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
-}
-
-function cmd_aws_list_subnets
-{
-    aws ec2 describe-subnets | jq -c '.Subnets[]' | while IFS=$"\n" read -r info; do summarize_aws_subnet "$info" ; done | sort
-}
-
-function cmd_list_subnets_post
-{
-    column -t -s $'\t'
-}
-
-function cmd_aws_create_vpc
-{
-    NAME="$1"
-    if [ -z "$NAME" ]
-    then
-        echo "Usage: moln aws create-vpc Name"
-        exit 1
-    fi
-    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"}]'"
-    echo "Create AWS vpc $NAME $TAGS"
-}
-
-############################################################################################
-#
-# Public IPs (global internet addresses)
-#
-############################################################################################
-
-function summarize_aws_ip
-{
-    # Expects a compact json on a single line, no extra spaces.
-    JSON="$1"
-    if [ -n "$JSON" ]
-    then
-        echo "$1" | jq .
-    fi
-}
-
-function cmd_list_ips_pre
-{
-    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
-}
-
-function cmd_aws_list_ips
-{
-    aws ec2 describe-addresses | jq -c '.Addresses[]' | while IFS=$"\n" read -r info; do summarize_aws_ip "$info" ; done
-}
-
-function cmd_list_vpcs_ips
-{
-    #    column -t -s $'\t'
-    echo ""
-}
-
-function cmd_aws_allocate_ip
-{
-    NAME="$1"
-    if [ -z "$NAME" ]
-    then
-        echo "Usage: moln aws create-ip Name"
-        exit 1
-    fi
-    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"}]'"
-    echo aws ec2 allocate-address
-}
-
-
-############################################################################################
-#
-# Buckets
-#
-############################################################################################
+cmds_Buckets="list-buckets list-bucket-content"
 
 function summarize_aws_bucket
 {
@@ -418,12 +156,399 @@ function cmd_list_buckets_post
 {
     column -t -s $'\t'
 }
+# Connect to a remote cli console for the cloud service. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
 
-############################################################################################
+cmds_Cloud_Console="console"
+
+## whoami ########################################################
+
+function cmd_aws_console {
+    echo "# Connecting to aws cloud console..."
+}
+
+function cmd_azure_console {
+    echo "# Connecting to azure cloud console..."
+}
+
+function cmd_gcloud_console {
+    echo "# Connecting to gcloud cloud console..."
+}
+# Costs part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Costs="list-costs"
+
+## costs ########################################################
+
+function cmd_aws_list_costs
+{
+cat > /tmp/filters.json <<EOF
+{
+    "Dimensions": {
+        "Key": "SERVICE",
+        "Values": [
+            "Amazon Elastic Compute Cloud - Compute"
+        ]
+    }
+}
+EOF
+
+    aws ce get-cost-and-usage \
+    --time-period Start=2021-12-01,End=2021-12-30 \
+    --metrics "BlendedCost" \
+    --granularity MONTHLY \
+    --filter='{ "Dimensions": { "Key": "SERVICE", "Values": [ "Amazon Elastic Compute Cloud - Compute" ] } }' \
+    --group-by "Type=TAG,Key=Customer" | tee costs.json
+}
+#    --filter file:///tmp/filters.json \
+# Dns part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Dns="list-hosted-zones list-dns-records upsert-dns-record remove-dns-record list-domains"
+
+## dns ############################################################
+
+function cmd_list_hosted_zones_pre
+{
+    printf "CLOUD\tDOMAIN\tPRIVATE\tID\t\n"
+}
+
+function cmd_aws_list_hosted_zones
+{
+    aws route53 --region us-east-1 list-hosted-zones | \
+        jq -r '.HostedZones[] | [ "aws", .Name, .Config.PrivateZone, .Id ] | join("\t")'
+}
+
+function cmd_list_dns_records_pre
+{
+    printf "CLOUD\tDOMAIN\tTYPE\tTTL\tIP\t\n"
+}
+
+function cmd_aws_list_dns_records
+{
+    DOMAIN=$1
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    aws route53 list-resource-record-sets --hosted-zone-id=${ID} | \
+        jq -r '.ResourceRecordSets[] | [ "aws", .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' \
+        | grep -v "SOA" | grep -v "NS"
+}
+
+function cmd_list_domains_pre
+{
+    printf "CLOUD\tDOMAIN\tAUTO_RENEW\tTRANSFER_LOCK\tEXPIRES\t\n"
+}
+
+function cmd_aws_list_domains
+{
+    aws route53domains --region us-east-1 list-domains | \
+        jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
+}
+
+function cmd_aws_upsert_dns_record
+{
+    # Usage: moln aws upsert-dns-record testur.ferrrbarr.com A 10.11.12.13
+    NAME=$1
+    TYPE=$2
+    DEST=$3
+
+    if [ -z "$NAME" ] || [ -z "$TYPE" ] || [ -z "$DEST" ]
+    then
+        echo "Usage: moln aws upsert-dns-record alfa.beta.com A 1.2.3.4"
+        exit 1
+    fi
+    # Grab the host name.
+    HOST=${NAME%%.*}
+    # Grab everything after the first .
+    DOMAIN=${NAME#*.}
+
+    if [ -z "$DOMAIN" ]
+    then
+        echo "You must have a full host.domain.com specified!"
+        exit 1
+    fi
+
+    FILE=$(mktemp create_record_XXXXXXX.json)
+    cat > $FILE <<EOF
+{
+    "Comment": "CREATE/DELETE/UPSERT a record ",
+    "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+        "Name": "${NAME}.",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "${DEST}"}]
+    }}]
+}
+EOF
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    echo "Adding $HOST $TYPE $DEST to domain $DOMAIN $ID"
+
+    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+}
+
+function cmd_aws_remove_dns_record
+{
+    # Usage: moln aws remove-dns-record testur.ferrrbarr.com
+    NAME=$1
+
+    if [ -z "$NAME" ]
+    then
+        echo "Usage: moln aws remove-dns-record alfa.beta.com"
+        exit 1
+    fi
+    # Grab the host name.
+    HOST=${NAME%%.*}
+    # Grab everything after the first .
+    DOMAIN=${NAME#*.}
+
+    if [ -z "$DOMAIN" ]
+    then
+        echo "You must have a full host.domain.com specified!"
+        exit 1
+    fi
+
+    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
+
+    FIELDS=$(aws route53 list-resource-record-sets --hosted-zone-id ${ID} | \
+                 jq -r '.ResourceRecordSets[] | [ .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' | \
+          grep "$NAME")
+
+    NAMEO=$(echo "$FIELDS" | cut -f 1)
+    TYPE=$(echo "$FIELDS" | cut -f 2)
+    TTL=$(echo "$FIELDS" | cut -f 3)
+    DEST=$(echo "$FIELDS" | cut -f 4)
+
+    if [ -z "$NAMEO" ]
+    then
+        echo "No record for $NAME exists!"
+        exit 1
+    fi
+
+    echo "Removing $HOST $TYPE $DEST from domain $DOMAIN $ID"
+
+    FILE=$(mktemp remove_record_XXXXXXX.json)
+    cat > $FILE <<EOF
+{
+    "Comment": "CREATE/DELETE/UPSERT a record ",
+    "Changes": [{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+        "Name": "${NAME}",
+        "Type": "${TYPE}",
+        "TTL": ${TTL},
+        "ResourceRecords": [{ "Value": "${DEST}"}]
+    }}]
+}
+EOF
+
+    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+}
+# Groups part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Groups="list-groups-for-user list-attached-group-policies"
+
+## groups ########################################################
+###############################################################################
+# Install part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
+###############################################################################
+
+cmds_Install_Tools="install"
+
+function cmd_install_pre {
+    mkdir -p $HOME/opt
+    mkdir -p $HOME/bin
+    if ! command -v unzip &> /dev/null
+    then
+        echo "Please install the unzip command!"
+        exit 1
+    fi
+}
+
+function cmd_aws_install
+{
+    echo "Fetching https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip into $HOME/opt"
+    cd $HOME/opt
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    echo "Unzipping downloaded cli zip..."
+    unzip -q awscliv2.zip
+    echo "Now running: ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin"
+    ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin
+    echo "You can now delete the directory ./aws"
+    echo "Done."
+}
+
+function cmd_gcloud_install {
+    echo "Fetching https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz"
+    cd $HOME/opt
+    curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz -o gcsdk.tgz
+    echo "Untaring downloaded cli tgz..."
+    tar xzf gcsdk.tgz
+    echo "Now running: ./google-cloud-sdk/install.sh"
+    ./google-cloud-sdk/install.sh
+    echo "You can now delete ./google-cloud-sdk"
+    echo "Done."
+}
+
+function cmd_azure_install {
+    echo "Removing azure-cli to avoid any old versions in Ubuntu universe 20..." ;
+    sudo apt remove azure-cli -y && sudo apt autoremove -y
+    sudo apt-get update
+    echo "Installing necessary tools to install"
+    sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg
+    echo "Installing microsoft gpg public key."
+    curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+        gpg --dearmor | \
+        sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+    echo "Adding microsoft deb repo to apt."
+    AZ_REPO=$(lsb_release -cs)
+    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+        sudo tee /etc/apt/sources.list.d/azure-cli.list
+    echo "Installing azure-cli."
+    sudo apt-get update
+    sudo apt-get install azure-cli
+    echo "Done."
+}
+##################################################################################
+# IP address part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
+##################################################################################
+
+cmds_Public_IPs="allocate-ip list-ips bind-ip"
+
+function summarize_aws_ip
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        echo "$1" | jq .
+    fi
+}
+
+function cmd_list_ips_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_ips
+{
+    aws ec2 describe-addresses | jq -c '.Addresses[]' | while IFS=$"\n" read -r info; do summarize_aws_ip "$info" ; done
+}
+
+function cmd_list_vpcs_ips
+{
+    #    column -t -s $'\t'
+    echo ""
+}
+
+function cmd_aws_allocate_ip
+{
+    NAME="$1"
+    if [ -z "$NAME" ]
+    then
+        echo "Usage: moln aws create-ip Name"
+        exit 1
+    fi
+    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"}]'"
+    echo aws ec2 allocate-address
+}
+# Policies part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Policies="list-policies"
+
+# policies ############################################################################################
+
+function cmd_aws_list_policies
+{
+    POLICY=$1
+    aws iam list-policies --query  "Policies[].Arn"
+}
+# Roles part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Roles="print-default-role-policy create-role attach-role-policy list-attached-role-policies list-roles assume-role"
+
+## roles ############################################################
+
+function cmd_aws_list_roles
+{
+    ROLE=$1
+    aws iam list-roles --query  "Roles[].Arn"
+}
+
+function cmd_aws_assume_role
+{
+    ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT}:role/$1
+    SESSION_NAME=$2
+    if [ -z "$SESSION_NAME" ] || [ -z "$ROLE_ARN" ]
+    then
+        echo "Usage: moln aws assume-role <role> <session_name>"
+        exit 1
+    fi
+    echo "aws sts assume-role --role-arn $ROLE_ARN --role-session-name $SESSION_NAME > session.token"
+    aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" > session.token
+    ROLE_SESSION_NAME=$(jq .AssumedRoleUser.Arn session.token | tr -d '"' | cut -f 2- -d '/')
+    echo "Role session ${ROLE_SESSION_NAME} expires $(jq .Credentials.Expiration session.token | tr -d '"')"
+    AWS_ACCESS_KEY_ID=$(jq .Credentials.AccessKeyId session.token | tr -d '"') \
+    AWS_SECRET_ACCESS_KEY=$(jq .Credentials.SecretAccessKey session.token | tr -d '"') \
+    AWS_SESSION_TOKEN=$(jq .Credentials.SessionToken session.token | tr -d '"') \
+    bash --rcfile <(echo 'export PS1="${PS1}\[\033[01;31m\]['${ROLE_SESSION_NAME}']\[\033[00m\]\$ "')
+}
+# Subnet part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Subnets_inside_a_VPC="create-subnet list-subnets"
+
+## subnets ########################################################
+
+function summarize_aws_subnet
+{
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        NAME='Not set!'
+        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
+        then
+            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
+        fi
+        ID=$(echo "$JSON" | jq -jr '.VpcId')
+        STATUS=$(echo "$JSON" | jq -jr '.State')
+        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
+        IS_DEFAULT=
+        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
+        then
+            IS_DEFAULT=DEFAULT
+        fi
+
+        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+    fi
+}
+
+function cmd_list_subnets_pre
+{
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
+}
+
+function cmd_aws_list_subnets
+{
+    aws ec2 describe-subnets | jq -c '.Subnets[]' | while IFS=$"\n" read -r info; do summarize_aws_subnet "$info" ; done | sort
+}
+
+function cmd_list_subnets_post
+{
+    column -t -s $'\t'
+}
+# User part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+
+cmds_Users="create-user create-policy print-default-user-policy attach-user-policy list-attached-user-policies"
+
+## users ########################################################
+# Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
 #
-# Virtual machines
-#
-############################################################################################
+# Virtual machine information part of moln.
+
+cmds_Vms="create-vm-from-template show-vm start-vm stop-vm list-vms destroy-vm ssh_to_vm set-vm-customer list-vm-templates show-vm-image list-disk-snapshots"
 
 function cmd_aws_to_vm_id
 {
@@ -713,199 +838,84 @@ function cmd_aws_set_vm_customer
     CUSTOMER="$2"
     aws ec2 create-tags --resources $SERVER --tags 'Key=Customer,Value='$CUSTOMER
 }
+# Vpc part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
 
-## DNS ############################################################
+cmds_Virtual_Private_Clouds="create-vpc list-vpcs"
 
-function cmd_list_hosted_zones_pre
+## vpc ########################################################
+
+function cmd_aws_create_vpc
 {
-    printf "CLOUD\tDOMAIN\tPRIVATE\tID\t\n"
-}
-
-function cmd_aws_list_hosted_zones
-{
-    aws route53 --region us-east-1 list-hosted-zones | \
-        jq -r '.HostedZones[] | [ "aws", .Name, .Config.PrivateZone, .Id ] | join("\t")'
-}
-
-function cmd_list_dns_records_pre
-{
-    printf "CLOUD\tDOMAIN\tTYPE\tTTL\tIP\t\n"
-}
-
-function cmd_aws_list_dns_records
-{
-    DOMAIN=$1
-
-    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
-
-    aws route53 list-resource-record-sets --hosted-zone-id=${ID} | \
-        jq -r '.ResourceRecordSets[] | [ "aws", .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' \
-        | grep -v "SOA" | grep -v "NS"
-}
-
-function cmd_list_domains_pre
-{
-    printf "CLOUD\tDOMAIN\tAUTO_RENEW\tTRANSFER_LOCK\tEXPIRES\t\n"
-}
-
-function cmd_aws_list_domains
-{
-    aws route53domains --region us-east-1 list-domains | \
-        jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
-}
-
-function cmd_aws_upsert_dns_record
-{
-    # Usage: moln aws upsert-dns-record testur.ferrrbarr.com A 10.11.12.13
-    NAME=$1
-    TYPE=$2
-    DEST=$3
-
-    if [ -z "$NAME" ] || [ -z "$TYPE" ] || [ -z "$DEST" ]
-    then
-        echo "Usage: moln aws upsert-dns-record alfa.beta.com A 1.2.3.4"
-        exit 1
-    fi
-    # Grab the host name.
-    HOST=${NAME%%.*}
-    # Grab everything after the first .
-    DOMAIN=${NAME#*.}
-
-    if [ -z "$DOMAIN" ]
-    then
-        echo "You must have a full host.domain.com specified!"
-        exit 1
-    fi
-
-    FILE=$(mktemp create_record_XXXXXXX.json)
-    cat > $FILE <<EOF
-{
-    "Comment": "CREATE/DELETE/UPSERT a record ",
-    "Changes": [{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-        "Name": "${NAME}.",
-        "Type": "A",
-        "TTL": 300,
-        "ResourceRecords": [{ "Value": "${DEST}"}]
-    }}]
-}
-EOF
-
-    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
-
-    echo "Adding $HOST $TYPE $DEST to domain $DOMAIN $ID"
-
-    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
-}
-
-function cmd_aws_remove_dns_record
-{
-    # Usage: moln aws remove-dns-record testur.ferrrbarr.com
-    NAME=$1
-
+    NAME="$1"
     if [ -z "$NAME" ]
     then
-        echo "Usage: moln aws remove-dns-record alfa.beta.com"
+        echo "Usage: moln aws create-vpc Name"
         exit 1
     fi
-    # Grab the host name.
-    HOST=${NAME%%.*}
-    # Grab everything after the first .
-    DOMAIN=${NAME#*.}
+    TAGS="ResourceType=string,Tags='[{Key=Name,Value=\"${NAME}\"}]'"
+    echo "Create AWS vpc $NAME $TAGS"
+}
 
-    if [ -z "$DOMAIN" ]
-    then
-        echo "You must have a full host.domain.com specified!"
-        exit 1
-    fi
-
-    ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
-
-    FIELDS=$(aws route53 list-resource-record-sets --hosted-zone-id ${ID} | \
-                 jq -r '.ResourceRecordSets[] | [ .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' | \
-          grep "$NAME")
-
-    NAMEO=$(echo "$FIELDS" | cut -f 1)
-    TYPE=$(echo "$FIELDS" | cut -f 2)
-    TTL=$(echo "$FIELDS" | cut -f 3)
-    DEST=$(echo "$FIELDS" | cut -f 4)
-
-    if [ -z "$NAMEO" ]
-    then
-        echo "No record for $NAME exists!"
-        exit 1
-    fi
-
-    echo "Removing $HOST $TYPE $DEST from domain $DOMAIN $ID"
-
-    FILE=$(mktemp remove_record_XXXXXXX.json)
-    cat > $FILE <<EOF
+function summarize_aws_vpc
 {
-    "Comment": "CREATE/DELETE/UPSERT a record ",
-    "Changes": [{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-        "Name": "${NAME}",
-        "Type": "${TYPE}",
-        "TTL": ${TTL},
-        "ResourceRecords": [{ "Value": "${DEST}"}]
-    }}]
+    # Expects a compact json on a single line, no extra spaces.
+    JSON="$1"
+    if [ -n "$JSON" ]
+    then
+        NAME='Not set!'
+        if [ "$(echo "$JSON" | jq -jr '.Tags')" != "null" ]
+        then
+            NAME=$(echo "$JSON" | jq -jr '(.Tags[] | select (.Key == "Name") | .Value)')
+        fi
+        ID=$(echo "$JSON" | jq -jr '.VpcId')
+        STATUS=$(echo "$JSON" | jq -jr '.State')
+        CIDR_BLOCK=$(echo "$JSON" | jq -jr '.CidrBlock')
+        IS_DEFAULT=
+        if [ "$(echo "$JSON" | jq -jr '.IsDefault')" = "true" ]
+        then
+            IS_DEFAULT=DEFAULT
+        fi
+
+        printf "aws\t$NAME\t$CIDR_BLOCK\t$STATUS\t$ID\t$IS_DEFAULT\n"
+    fi
 }
-EOF
 
-    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
-}
-
-## install ########################################################
-
-function cmd_aws_install
+function cmd_list_vpcs_pre
 {
-    echo "Fetching https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip into $HOME/opt"
-    cd $HOME/opt
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    echo "Unzipping downloaded cli zip..."
-    unzip -q awscliv2.zip
-    echo "Now running: ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin"
-    ./aws/install -i $HOME/opt/aws-cli -b $HOME/bin
-    echo "You can now delete the directory ./aws"
-    echo "Done."
+    printf "CLOUD\tNAME\tCIDR_BLOCK\tSTATUS\tID\t\n"
 }
 
-function cmd_gcloud_install {
-    echo "Fetching https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz"
-    cd $HOME/opt
-    curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-407.0.0-linux-x86_64.tar.gz -o gcsdk.tgz
-    echo "Untaring downloaded cli tgz..."
-    tar xzf gcsdk.tgz
-    echo "Now running: ./google-cloud-sdk/install.sh"
-    ./google-cloud-sdk/install.sh
-    echo "You can now delete ./google-cloud-sdk"
-    echo "Done."
+function cmd_aws_list_vpcs
+{
+    aws ec2 describe-vpcs | jq -c '.Vpcs[]' | while IFS=$"\n" read -r info; do summarize_aws_vpc "$info" ; done
 }
 
-function cmd_azure_install {
-    echo "Removing azure-cli to avoid any old versions in Ubuntu universe 20..." ;
-    sudo apt remove azure-cli -y && sudo apt autoremove -y
-    sudo apt-get update
-    echo "Installing necessary tools to install"
-    sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg
-    echo "Installing microsoft gpg public key."
-    curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
-        gpg --dearmor | \
-        sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
-    echo "Adding microsoft deb repo to apt."
-    AZ_REPO=$(lsb_release -cs)
-    echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
-        sudo tee /etc/apt/sources.list.d/azure-cli.list
-    echo "Installing azure-cli."
-    sudo apt-get update
-    sudo apt-get install azure-cli
-    echo "Done."
+function cmd_list_vpcs_post
+{
+    column -t -s $'\t'
+}
+###############################################################################
+# Web api part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
+###############################################################################
+
+cmds_Apis="list-api-domains"
+
+function cmd_list_api_domains_pre
+{
+    printf "DOMAIN\tNAME\t\n"
 }
 
+function cmd_aws_list_api_domains
+{
+    aws apigatewayv2 get-domain-names | jq -r -c '.Items[].DomainName'
+}
+
+function cmd_list_api_domains
+{
+    column -t -s $'\t'
+}
 #############################################################
-# Main entry ################################################
+# Moln main function entry ##################################
 #############################################################
 
 # Extract all commands from the above set of command categories by parsing this file.

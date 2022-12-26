@@ -1,2 +1,6 @@
 #!/bin/bash
+
+apt install unzip
+apt install jq
+
 echo Done configuring.
