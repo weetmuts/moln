@@ -1,10 +1,10 @@
-name: Self Hosted Ubuntu
+name: Additional Testing
 on:
   push:
 
 jobs:
   build:
-    if: github.repository == 'viklauverk/moln.private'
+    if: endsWith(github.repository, '.private')
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
