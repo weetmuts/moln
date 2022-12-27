@@ -1,0 +1,13 @@
+name: Build Ubuntu
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v2
+    - id: MAKE
+      run: make
+    - id: TEST
+      run: make test
