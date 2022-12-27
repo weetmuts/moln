@@ -13,8 +13,8 @@ moln.1: moln moln_1_pre moln_1_post
 	cat moln_1_post >> moln.1
 
 test:
-	./moln -l
-	./moln -lc
+	./moln aws whoami
+	./moln aws list-vms
 
 install:
 	install moln $(PREFIX)/bin
