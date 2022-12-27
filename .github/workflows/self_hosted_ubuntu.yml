@@ -1,0 +1,14 @@
+name: Self Hosted Ubuntu
+on:
+  push:
+
+jobs:
+  build:
+    if: github.repository == 'viklauverk/moln.private'
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v2
+    - id: MAKE
+      run: make
+    - id: TEST
+      run: make test CREDENTIALS_EXIST=true

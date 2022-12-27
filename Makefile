@@ -13,8 +13,8 @@ moln.1: moln moln_1_pre moln_1_post
 	cat moln_1_post >> moln.1
 
 test:
-	./moln aws whoami
-	./moln aws list-vms
+	@./tests/test_basics.sh
+	@if [ "$(CREDENTIALS_EXIST)" = "true" ]; then ./tests/test_with_credentials.sh ; fi
 
 install:
 	install moln $(PREFIX)/bin
