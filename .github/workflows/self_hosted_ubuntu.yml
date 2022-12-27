@@ -9,4 +9,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - id: GO
-      run: /work/runner/test_moln.sh
+      run: /work/tools/test.sh
