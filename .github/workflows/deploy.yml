@@ -1,0 +1,31 @@
+name: Deploy test
+run-name: Deploy test ${{ github.event.inputs.ref }} on http://${{ github.event.inputs.domain }}.tjo by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Reference
+        required: true
+      domain:
+        description: Domain
+        required: true
+      force:
+        description: Adjust
+        type: boolean
+
+jobs:
+  setup:
+    name: Deplying test
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: /work/build
+    steps:
+      - name: Setup ${{ github.event.inputs.domain }}
+        id: setup
+        run: echo "./launch_vm.sh --public=${{ github.event.inputs.public }} ${{ github.event.inputs.domain }}"
+
+      - name: Cleanup on failure
+        id: failure_step
+        if: ${{ failure() && steps.launch_vm.outcome == 'success' }}
+        run: echo "Cleaning up after failure."
