@@ -1,0 +1,109 @@
+\documentclass{article}
+\usepackage{parskip}
+\usepackage[dvipsnames]{xcolor}
+
+\newcommand{\cmd}[1]{\textcolor{Red}{#1}}
+\newcommand{\help}[1]{#1\par}
+\newcommand{\cloud}[1]{\textcolor{Green}{#1}}
+
+\begin{document}
+\tt
+    {\Large Moln Cross Reference CLI Commands AWS/Azure/Gcloud}
+
+    Moln is a bash shell script to simplify the initial work with multiple cloud providers.
+
+    \begin{itemize}
+    \item{Use it to quickly install the cloud providers cli}
+    \item{Use it to perform commands on several cloud providers at once.}
+    \item{Use it to learn how to work with different cloud provicer cli:s.}
+    \end{itemize}
+
+    Perform specific cloud configuration using the web interface (for example vm templates)
+    then use moln to start a vm using the prepared vm template.
+
+    Examples:
+
+    \textcolor{Blue}{moln aws install} \linebreak
+    \textcolor{Blue}{moln azure whoami} \linebreak
+    \textcolor{Blue}{moln gcloud list-users} \linebreak
+    \textcolor{Blue}{moln aws list-subnets} \linebreak
+    \textcolor{Blue}{moln all list-vms} \linebreak
+    \textcolor{Blue}{moln aws list-vm-templates} \linebreak
+    \textcolor{Blue}{moln aws create-vm-from-templates} \linebreak
+    \textcolor{Blue}{moln aws upsert-dns-record www.fooobar.com A 10.11.12.13} \linebreak
+    \textcolor{Blue}{moln aws assume-role allaccess MYSESSION3} \linebreak
+    \textcolor{Blue}{moln --list-help} \linebreak
+    \par{\large BASIC}\par
+\cmd{whoami} \help{Display active account/identity.}
+\cloud{aws sts get-caller-identity}
+\cloud{az account list}
+\cloud{gcloud config list}
+
+{\large BUCKET}\par
+\cmd{list-buckets} \help{List storage buckets, ie aws s3/gcloud storage/azure blobs.}
+\cloud{aws s3api list-buckets --output json}
+
+{\large COST}\par
+\cmd{list-costs} \help{Print a summary of monthly costs for the last 12 months.}
+
+{\large DNS}\par
+\cmd{list-hosted-zones} \help{List zones the dns is configured to serve.}
+\cloud{aws route53 --region us-east-1 list-hosted-zones}
+\cmd{list-dns-records} \help{List dns records in a zone.}
+\cloud{aws route53 list-resource-record-sets --hosted-zone-id=\${ID}}
+\cmd{upsert-dns-record NAME TYPE DEST} \help{Insert or update a dns record.}
+\cloud{aws route53 change-resource-record-sets --hosted-zone-id \${ID} --change-batch file://\${FILE}}
+\cmd{remove-dns-record NAME} \help{Remove a dns record.}
+\cloud{aws route53 change-resource-record-sets --hosted-zone-id \${ID} --change-batch file://\${FILE}}
+\cmd{list-domains} \help{List dns domains.}
+\cloud{aws route53domains --region us-east-1 list-domains}
+
+{\large GROUP}\par
+\cmd{list-groups} \help{List iam groups.}
+\cloud{aws iam list-groups}
+\cloud{az ad group list}
+\cmd{list-groups-for-user} \help{List groups to which a user belongs.}
+
+{\large CLI}\par
+\cmd{install} \help{Install the specified cloud cli.}
+
+{\large IP}\par
+\cmd{list-ips} \help{List allocated external ip numbers.}
+\cloud{aws ec2 describe-addresses}
+
+{\large POLICY}\par
+\cmd{list-policies} \help{List iam policies.}
+\cloud{aws iam list-policies}
+
+{\large ROLE}\par
+\cmd{assume-role ROLE SESSION} \help{Start a subshell with the rights of the assumed role.}
+\cloud{aws sts assume-role --role-arn "arn:aws:iam::\${AWS\_ACCOUNT}:role/\$ROLE" --role-session-name "\$SESSION"}
+\cmd{list-roles} \help{List iam roles.}
+\cloud{aws iam list-roles}
+
+{\large SUBNET}\par
+\cmd{list-subnets} \help{List all subnets.}
+\cloud{aws ec2 describe-subnets}
+
+{\large USER}\par
+\cmd{list-users} \help{List users in cloud account.}
+\cloud{aws iam list-users}
+\cloud{az ad user list}
+\cloud{gcloud iam service-accounts --format=json list}
+
+{\large VM}\par
+\cmd{create-vm-from-template NAME TEMPLATE\_NAME} \help{Create a virtual machine based on an existing vm template.}
+\cloud{aws ec2 run-instances --launch-template LaunchTemplateName=\${TEMPLATE\_NAME} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=\${NAME}}]"}
+\cloud{az foo bar \${TEMPLATE\_NAME} \${NAME}}
+\cmd{destroy-vm NAMEID NAMEID} \help{Destroy a virtual machine.}
+
+{\large VPC}\par
+\cmd{list-vpcs} \help{List virtual private clouds/networks, aka vpc:s and vnets.}
+\cloud{aws ec2 describe-vpcs}
+\cloud{az network vnet list}
+
+{\large WEBAPI}\par
+\cmd{list-webapi-domains} \help{List domain names mapped to web apis (REST/HTTPs) routers.}
+\cloud{aws apigatewayv2 get-domain-names}
+
+\end{document}

@@ -1,0 +1,36 @@
+\documentclass{article}
+\usepackage{parskip}
+\usepackage[dvipsnames]{xcolor}
+
+\newcommand{\cmd}[1]{\textcolor{Red}{#1}}
+\newcommand{\help}[1]{#1\par}
+\newcommand{\cloud}[1]{\textcolor{Green}{#1}}
+
+\begin{document}
+\tt
+    {\Large Moln Cross Reference CLI Commands AWS/Azure/Gcloud}
+
+    Moln is a bash shell script to simplify the initial work with multiple cloud providers.
+
+    \begin{itemize}
+    \item{Use it to quickly install the cloud providers cli}
+    \item{Use it to perform commands on several cloud providers at once.}
+    \item{Use it to learn how to work with different cloud provicer cli:s.}
+    \end{itemize}
+
+    Perform specific cloud configuration using the web interface (for example vm templates)
+    then use moln to start a vm using the prepared vm template.
+
+    Examples:
+
+    \textcolor{Blue}{moln aws install} \linebreak
+    \textcolor{Blue}{moln azure whoami} \linebreak
+    \textcolor{Blue}{moln gcloud list-users} \linebreak
+    \textcolor{Blue}{moln aws list-subnets} \linebreak
+    \textcolor{Blue}{moln all list-vms} \linebreak
+    \textcolor{Blue}{moln aws list-vm-templates} \linebreak
+    \textcolor{Blue}{moln aws create-vm-from-templates} \linebreak
+    \textcolor{Blue}{moln aws upsert-dns-record www.fooobar.com A 10.11.12.13} \linebreak
+    \textcolor{Blue}{moln aws assume-role allaccess MYSESSION3} \linebreak
+    \textcolor{Blue}{moln --list-help} \linebreak
+    \par

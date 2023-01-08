@@ -1,0 +1,29 @@
+html {
+    head {
+        meta(http-equiv = content-type
+             content    = 'text/html;charset=utf-8')
+        title = 'wmbusmeters editor'
+        link(type = text/css
+             href = style.css
+             rel  = stylesheet)
+    }
+
+body {
+     h1 = 'Moln Cross Reference CLI Commands AWS/Azure/Gcloud'
+     'Moln is a bash shell script to simplify the initial work with multiple cloud providers.'
+     ul {
+        li = 'Use it to quickly install the cloud providers cli'
+        li = 'Use it to perform commands on several cloud providers at once.'
+        li = 'Use it to learn how to work with different cloud provicer cli:s.'
+    }
+    'Complicated cloud configuration is performed using the web interface.
+     After you have prepared (for example) a vm template, then you can start it with moln.'
+    p
+    b = Examples:
+    pre = 'moln aws install'
+    pre = 'moln azure whoami'
+    pre = 'moln gcloud list-users'
+    pre = 'moln aws list-subnets'
+    pre = 'moln all list-vms'
+    pre = 'moln aws assume-role allaccess MYSESSION3'
+    pre = 'moln --list-help'

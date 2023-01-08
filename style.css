@@ -1,0 +1,32 @@
+html {
+  box-sizing: border-box;
+}
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+body {
+    padding: 5em;
+    margin: 0;
+    font-family: "Courier New", monospace;
+    word-wrap: break-word;
+    background-color: white;
+}
+
+pre {
+    margin-left: 3em;
+    color: darkblue;
+}
+
+pre.cloud {
+    margin-left: 5em;
+    color: darkgreen;
+}
+
+cmd {
+    color: red;
+}
+
+help {
+    color: black;
+}
