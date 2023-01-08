@@ -1,8 +1,9 @@
-###############################################################################
-# Install part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT #
-###############################################################################
+cmds_CLI="install"
 
-cmds_Install_Tools="install"
+function help_install
+{
+    echo "Install the specified cloud cli."
+}
 
 function cmd_install_pre {
     mkdir -p $HOME/opt

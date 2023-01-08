@@ -1,11 +1,6 @@
-# Policies part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+cmds_POLICY="list-policies"
 
-cmds_Policies="list-policies"
-
-# policies ############################################################################################
-
-function cmd_aws_list_policies
+function help_list_policies
 {
-    POLICY=$1
-    aws iam list-policies --query  "Policies[].Arn"
+    echo "List iam policies."
 }

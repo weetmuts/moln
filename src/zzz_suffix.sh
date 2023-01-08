@@ -12,74 +12,152 @@ all_cmd_groups="$(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
 all_clouds="all aws azure gcloud"
 clouds="aws azure gcloud"
 verbose=false
+list_help=false
 
-if [ "$1" = "-l" ] || [ "$1" = "--list-commands" ]
+if [ -t 1 ]
 then
-    echo "$all_cmds"
-    exit 0
+    output=terminal
+else
+    output=ascii
 fi
 
-if [ "$1" = "-lc" ] || [ "$1" = "--list-clouds" ]
-then
-    echo "$all_clouds"
-    exit 0
-fi
+while :
+do
+    if [[ ! "$1" =~ -[a-z_-]+ ]]
+    then
+        break
+    fi
 
-if [ "$1" = "-v" ] || [ "$1" = "--verbose" ]
-then
-    verbose=true
-    shift 1
-fi
+    if [ "$1" = "-l" ] || [ "$1" = "--list-commands" ]
+    then
+        echo "$all_cmds"
+        exit 0
+    fi
 
-if [ "$1" = "-d" ] || [ "$1" = "--debug" ]
-then
-    verbose=true
-    debug=true
-    shift 1
-fi
+    if [ "$1" = "-lc" ] || [ "$1" = "--list-clouds" ]
+    then
+        echo "$all_clouds"
+        exit 0
+    fi
 
-if [ "$1" = "--list-command-coverage" ]
-then
-    for i in $all_cmd_groups
-    do
-        echo "${blue}##### ${i#*_} ${normal}"
-        echo
-        {
-        tmp="$(eval echo $i)"
-        for j in $tmp
+    if [ "$1" = "-v" ] || [ "$1" = "--verbose" ]
+    then
+        verbose=true
+        shift 1
+    fi
+
+    if [ "$1" = "-d" ] || [ "$1" = "--debug" ]
+    then
+        verbose=true
+        debug=true
+        shift 1
+    fi
+
+    if [[ "$1" =~ --output=[a-z]+ ]]
+    then
+        output=$(echo "$1" | cut -f 2 -d '=')
+        case $output in
+            terminal | ascii | man | htmq | tex)
+                true ;;
+            *)
+                echo "Not a valid output format: $output"
+                echo "Use one of terminal ascii man htmq tex"
+                exit 1
+        esac
+        shift 1
+    fi
+
+    if [ "$1" = "--list-command-coverage" ]
+    then
+        for i in $all_cmd_groups
         do
-            info=""
-            for cloud in aws azure gcloud
-            do
-                cmdfunc="cmd_${cloud}_$(echo "$j" | sed 's/-/_/g')"
-                if [ "$(type -t $cmdfunc)" = "function" ]
-                then
-                    info="$info $green$cloud$normal"
-                fi
-            done
-            echo "$j $info"
+            echo "${blue}##### ${i#*_} ${normal}"
+            echo
+            {
+                tmp="$(eval echo $i)"
+                for j in $tmp
+                do
+                    info=""
+                    for cloud in aws azure gcloud
+                    do
+                        cmdfunc="cmd_${cloud}_$(echo "$j" | sed 's/-/_/g')"
+                        if [ "$(type -t $cmdfunc)" = "function" ]
+                        then
+                            info="$info $pre_cloud$cloud$post_cloud"
+                        fi
+                    done
+                    echo "$j $info"
+                done
+            } | column -t
+            echo
         done
-        } | column -t
-        echo
-    done
-    exit 0
-fi
+        exit 0
+    fi
 
-if [ "$1" = "--list-help" ]
+    if [ "$1" = "--list-help" ]
+    then
+        list_help=true
+        shift 1
+    fi
+done
+
+case $output in
+    terminal)
+        pre_group="$blue"
+        post_group="$normal"
+        pre_cmd="$red"
+        post_cmd="$normal"
+        pre_cloud="$green"
+        post_cloud="$normal"
+    ;;
+    ascii);;
+    man)
+        pre_group=".SH "
+        post_group=""
+        pre_cmd="\fB"
+        post_cmd="\fR"
+        pre_cloud='
+·'
+        post_cloud=""
+    ;;
+    htmq) ;;
+    tex) ;;
+esac
+
+if [ "$list_help" = true ]
 then
     for i in $all_cmd_groups
     do
-        echo "· ${i#*_}"
-        echo
+        echo "${pre_group}${i#*_}${post_group}"
         tmp="$(eval echo $i)"
         for j in $tmp
         do
             helpfunc="help_$(echo "$j" | sed 's/-/_/g')"
+            cmdfuncmatch="cmd_.*_$(echo "$j" | sed 's/-/_/g')"
             if [ "$(type -t $helpfunc)" = "function" ]
             then
-                echo "\fB$(eval $helpfunc | head -n 1)\fR"
-                echo ".br"
-                eval $helpfunc | tail -n 1
+                # This picks the first cloud implementation and extracts the arguments from there.
+                arguments=" $(sed -n '/'$cmdfuncmatch'/,/^\}$/{p;/^\}/q}' moln  | grep '="\$[1-9]"' | tr -d ' ' | cut -f 1 -d '=' | tr '\n' ' ')"
+                echo "${pre_cmd}$j$arguments${post_cmd}$(eval $helpfunc | head -n 1)"
+                for cloud in aws azure gcloud
+                do
+                    cmdvar="cmd_${cloud}_$(echo "$j" | sed 's/-/_/g')"
+                    cmdvar=$(echo $cmdvar | tr 'a-z' 'A-Z')
+                    body=$(eval echo "\$$cmdvar")
+                    if [ -n "$body" ]
+                    then
+                        echo -n "$pre_cloud"
+                        if [ "$output" = "terminal" ] || [ "$output" = "ascii" ]
+                        then
+                            tabs 8
+                            echo "$body" | fold -s -w 80  | sed -e "s|^|\t|g"
+                            tabs -8
+                        else
+                            echo "$body"
+                        fi
+                        echo -n "$post_cloud"
+                    fi
+                done
             fi
         done
         echo
@@ -91,7 +169,11 @@ cloud=$1
 cmd=$2
 if [ "$cloud" = "" ] || [ "$cmd" = "" ]
 then
-    echo "Usage: moln {all|aws|azure|gcloud} [command] <options> <args>"
+    echo "Usage: moln [options] {all|aws|azure|gcloud} [command] <args>"
+    echo "       -l  --list-commands List all commands"
+    echo "       -lc --list-clouds   List all clouds"
+    echo "       --list-help         List help"
+    echo "       --output=[terminal|ascii|man|htmq|tex]"
     exit 0
 fi
 

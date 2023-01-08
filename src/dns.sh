@@ -1,8 +1,19 @@
-# Dns part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+cmds_DNS="list-hosted-zones list-dns-records upsert-dns-record remove-dns-record list-domains"
 
-cmds_Dns="list-hosted-zones list-dns-records upsert-dns-record remove-dns-record list-domains"
+function help_list_hosted_zones
+{
+    echo "List zones the dns is configured to serve."
+}
 
-## dns ############################################################
+function help_list_dns_records
+{
+    echo "List dns records in a zone."
+}
+
+function help_list_domains
+{
+    echo "List dns domains."
+}
 
 function cmd_list_hosted_zones_pre
 {

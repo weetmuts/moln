@@ -2,15 +2,22 @@
 PREFIX?=/usr/local
 SOURCES=$(sort $(wildcard src/*))
 
-all: moln moln.1
+all: moln
 
 moln: $(SOURCES)
-	cat $(SOURCES) > moln
+	@rm -f moln
+	@cat $(SOURCES) > moln
+	@chmod a+x moln
+	@echo "Built moln"
+
+moln.tex: moln
+	@cat moln | grep -o '^cmds_[^ =]*=' | td -d '=' > /tmp_all_command_groups.txt
+	@cat moln | grep -io "function help_[^ ]*" > /tmp/all_commands.txt
 
 moln.1: moln moln_1_pre moln_1_post
-	cp moln_1_pre moln.1
-	GENERATE_MANPAGE=true ./moln --list-help >> moln.1
-	cat moln_1_post >> moln.1
+	@cp moln_1_pre moln.1
+	@./moln --output=man --list-help >> moln.1
+	@cat moln_1_post >> moln.1
 
 test:
 	@./tests/test_basics.sh

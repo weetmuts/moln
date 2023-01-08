@@ -3,14 +3,16 @@
 moln \- Convenience shell script to work with cloud services.
 
 .SH SYNOPSIS
-.B moln [cloud] [command] {options}
+.B moln {options} [cloud] [command] {arguments}
 
 .SH DESCRIPTION
 
-Moln present a uniform api that is implemented using cli commands from different
-cloud providers. This can be used to work on multiple cloud providers (aws,gcloud,azure)
-using the same commands. Moln can also print the underlying cli command to refresh
-your memory or when you need to do more advanced commands against the cloud provider.
+Moln presents a uniform api that is implemented using cli commands
+from different cloud providers. This can be used to do simple work on
+multiple cloud providers (all,aws,azure,gcloud) using the same
+commands. Moln can also print the underlying cli command to refresh
+your memory or when you need to do more advanced commands against the
+cloud provider.
 
 Feel free to copy snippets and learn from this code. But as a whole it
 is licensed under the MIT license and requires legal notices.
@@ -18,10 +20,12 @@ is licensed under the MIT license and requires legal notices.
 .SH EXAMPLES
 
 .B moln aws install
+
 .B moln gcloud install
+
 .B moln azure install
 
-Download the aws cli commands and put a link to them inside your $HOME/bin directory and put the actual code in $HOME/opt.
+Download the aws cli commands and put links to them inside your $HOME/bin directory and put the actual code in $HOME/opt.
 
 .B moln aws whoami
 
@@ -40,72 +44,87 @@ Show a list of virtual machines for all your cloud providers for your accounts.
 Create a subshell, within which you have access to a different role to gain privileges. The subshell session is called TimeForWork.
 
 .SH OPTIONS
-\fB\-l\fR \fB\--list-commands\fR list all available commands.
+\fB\--list-help\fR list all available commands.
 .br
-\fB\-lc\fR \fB\--list-clouds\fR list all available clouds.
+\fB\--output=\fR[terminal|ascii|man|htmq|tex] choose output format.
+.br
+\fB\-l\fR list all available commands.
+.br
+\fB\-lc\fR list all available clouds.
 .br
 \fB\-v\fR verbose will show the underlying cli commands.
 .br
 \fB\-d\fR debug with a lot of information.
 .br
+.SH BASIC
+\fBwhoami \fRDisplay active account/identity.
 
-.SH COMMANDS
-· Basic_Information
+·aws sts get-caller-identity
 
-\fBwhoami\fR
-.br
-Display active account/identity.
+·az account list
 
-· Buckets
+·gcloud config list
 
-\fBlist-buckets\fR
-.br
-List storage buckets, ie aws s3/gcloud storage/azure blobs.
+.SH BUCKET
+\fBlist-buckets \fRList storage buckets, ie aws s3/gcloud storage/azure blobs.
 
-· Cloud_Console
+·aws s3api list-buckets --output json
 
+.SH COST
+\fBlist-costs \fRPrint a summary of monthly costs for the last 12 months.
 
-· Costs
+.SH DNS
+\fBlist-hosted-zones \fRList zones the dns is configured to serve.
+\fBlist-dns-records \fRList dns records in a zone.
+\fBlist-domains \fRList dns domains.
 
+.SH Groups
 
-· Dns
+.SH CLI
+\fBinstall \fRInstall the specified cloud cli.
 
+.SH IP
+\fBlist-ips \fRList allocated external ip numbers.
 
-· Groups
+·aws ec2 describe-addresses
 
+.SH Policies
 
-· Install_Tools
+.SH ROLE
 
+.SH SUBNET
+\fBlist-subnets \fRList all subnets.
 
-· Public_IPs
+·aws ec2 describe-subnets
 
+.SH USER
+\fBlist-users \fRList users in cloud account.
 
-· Policies
+·aws iam list-users
 
+·az ad user list
 
-· Roles
+·gcloud iam service-accounts --format=json list
 
+.SH VM
+\fBcreate-vm-from-template NAME TEMPLATE_NAME \fRCreate a virtual machine based on an existing vm template.
 
-· Subnets_inside_a_VPC
+·aws ec2 run-instances --launch-template LaunchTemplateName=${TEMPLATE_NAME} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]"
 
+·az foo bar ${TEMPLATE_NAME} ${NAME}
+\fBdestroy-vm NAMEID NAMEID \fRDestroy a virtual machine.
 
-· Users
+.SH VPC
+\fBlist-vpcs \fRList virtual private clouds/networks, aka vpc:s and vnets.
 
+·aws ec2 describe-vpcs
 
-· Vms
+·az network vnet list
 
-\fBlist-vms\fR
-.br
-List all available virtual machines.
+.SH WEBAPI
+\fBlist-webapi-domains \fRList domain names mapped to web apis (REST/HTTPs) routers.
 
-· Virtual_Private_Clouds
-
-\fBlist-vpcs\fR
-.br
-List virtual private clouds/networks, aka vpc:s and vnets.
-
-· WebApis
-
+·aws apigatewayv2 get-domain-names
 
 
 .SH AUTHOR

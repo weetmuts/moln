@@ -1,25 +1,24 @@
-# Basic information part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+cmds_BASIC="whoami"
 
-cmds_Basic_Information="whoami"
-
-## whoami ########################################################
-
-function help_whoami {
-    echo "whoami"
+function help_whoami
+{
     echo "Display active account/identity."
 }
 
-function cmd_aws_whoami {
-    echo "# AWS"
-    aws sts get-caller-identity
+CMD_AWS_WHOAMI="aws sts get-caller-identity"
+function cmd_aws_whoami
+{
+    $CMD_AWS_WHOAMI
 }
 
-function cmd_azure_whoami {
-    echo "# Azure"
-    az account list
+CMD_AZURE_WHOAMI="az account list"
+function cmd_azure_whoami
+{
+    $CMD_AZURE_WHOAMI
 }
 
-function cmd_gcloud_whoami {
-    echo "# Gcloud"
-    gcloud config list
+CMD_GCLOUD_WHOAMI="gcloud config list"
+function cmd_gcloud_whoami
+{
+    $CMD_GCLOUD_WHOAMI
 }

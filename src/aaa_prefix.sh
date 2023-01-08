@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2022 Fredrik Öhrström (spdx: MIT)
+# Copyright (C) 2022-2023 Fredrik Öhrström (spdx: MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -90,5 +90,21 @@ function duration_since
         fi
     else
         echo "${DIFF}d"
+    fi
+}
+
+function verbose
+{
+    if [ "$verbose" = "true" ]
+    then
+        >2 echo "$@"
+    fi
+}
+
+function debug
+{
+    if [ "$verbose" = "true" ] || [ "$debug" = "true" ]
+    then
+        >2 echo "$@"
     fi
 }
