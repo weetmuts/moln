@@ -1,13 +1,20 @@
-# Moln
+# Moln shell script and Cross Reference for cloud commands AWS/Azure/GCloud
 
-A bash shell script to simplify work with multiple cloud providers. In
-particular when you can't remember the cli command for your cloud
-flavour of the day.
+A bash shell script to simplify the initial work with multiple cloud providers.
 
-Do for example `moln aws list-vms` to list your vms in a plain list.
+Use it to quickly install the cloud providers cli.
+
+Use it to learn some of the basics of the different cloud provicer clis.
+
+Do simple recurring tasks, for example `moln aws list-vms` to list your vms in a plain list.
 To also learn the aws cli command for this do: `moln --verbose aws list-vms`
 
-This script focuses on simple use cases. For more advanced use cases
+This script focuses on simple use cases, the output is not stable it is for human consumption.
+
+You can for example list dns/users/roles/policies/groups/vpcs/subnets/vms etc.
+
+Prepare vm templates to create/destroy/start/stop vms. Upsert dns records to your new vm etc.
+
 please learn from the script and/or copy the script content to your
 own code.  You only need to keep the license and attribution to me if
 you copy large parts of this script.

@@ -165,7 +165,6 @@ function cmd_aws_show_vm {
 }
 
 CMD_AWS_LIST_VMS="aws ec2 describe-instances"
-
 function cmd_aws_list_vms {
     $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
 }

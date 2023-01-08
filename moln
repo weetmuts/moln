@@ -241,15 +241,19 @@ function help_list_domains
     echo "List dns domains."
 }
 
+function help_upsert_dns_record
+{
+    echo "Insert or update a dns record."
+}
+
+function help_remove_dns_record
+{
+    echo "Remove a dns record."
+}
+
 function cmd_list_hosted_zones_pre
 {
     printf "CLOUD\tDOMAIN\tPRIVATE\tID\t\n"
-}
-
-function cmd_aws_list_hosted_zones
-{
-    aws route53 --region us-east-1 list-hosted-zones | \
-        jq -r '.HostedZones[] | [ "aws", .Name, .Config.PrivateZone, .Id ] | join("\t")'
 }
 
 function cmd_list_dns_records_pre
@@ -257,34 +261,42 @@ function cmd_list_dns_records_pre
     printf "CLOUD\tDOMAIN\tTYPE\tTTL\tIP\t\n"
 }
 
+function cmd_list_domains_pre
+{
+    printf "CLOUD\tDOMAIN\tAUTO_RENEW\tTRANSFER_LOCK\tEXPIRES\t\n"
+}
+CMD_AWS_LIST_HOSTED_ZONES='aws route53 --region us-east-1 list-hosted-zones'
+function cmd_aws_list_hosted_zones
+{
+    $CMD_AWS_LIST_HOSTED_ZONES | \
+        jq -r '.HostedZones[] | [ "aws", .Name, .Config.PrivateZone, .Id ] | join("\t")'
+}
+
+CMD_AWS_LIST_DNS_RECORDS='aws route53 list-resource-record-sets --hosted-zone-id=${ID}'
 function cmd_aws_list_dns_records
 {
     DOMAIN=$1
 
     ID=$(aws route53 list-hosted-zones-by-name --dns-name ${DOMAIN} --query HostedZones[].Id --output text | cut -d/ -f3)
 
-    aws route53 list-resource-record-sets --hosted-zone-id=${ID} | \
+    eval $CMD_AWS_LIST_DNS_RECORDS | \
         jq -r '.ResourceRecordSets[] | [ "aws", .Name, .Type, .TTL, (.ResourceRecords[].Value )  ] | join("\t")' \
         | grep -v "SOA" | grep -v "NS"
 }
 
-function cmd_list_domains_pre
-{
-    printf "CLOUD\tDOMAIN\tAUTO_RENEW\tTRANSFER_LOCK\tEXPIRES\t\n"
-}
-
+CMD_AWS_LIST_DOMAINS='aws route53domains --region us-east-1 list-domains'
 function cmd_aws_list_domains
 {
-    aws route53domains --region us-east-1 list-domains | \
-        jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
+    $CMD_AWS_LIST_DOMAINS | jq -r '.Domains[] | [ "aws", .DomainName, .AutoRenew, .TransferLock, .Expiry ] | join("\t")'
 }
 
+CMD_AWS_UPSERT_DNS_RECORD='aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}'
 function cmd_aws_upsert_dns_record
 {
-    # Usage: moln aws upsert-dns-record testur.ferrrbarr.com A 10.11.12.13
-    NAME=$1
-    TYPE=$2
-    DEST=$3
+    # Usage: moln aws upsert-dns-record testur.foobar.com A 10.11.12.13
+    NAME="$1"
+    TYPE="$2"
+    DEST="$3"
 
     if [ -z "$NAME" ] || [ -z "$TYPE" ] || [ -z "$DEST" ]
     then
@@ -321,13 +333,14 @@ EOF
 
     echo "Adding $HOST $TYPE $DEST to domain $DOMAIN $ID"
 
-    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+    eval $CMD_AWS_UPSERT_DNS_RECORD
 }
 
+CMD_AWS_REMOVE_DNS_RECORD='aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}'
 function cmd_aws_remove_dns_record
 {
     # Usage: moln aws remove-dns-record testur.ferrrbarr.com
-    NAME=$1
+    NAME="$1"
 
     if [ -z "$NAME" ]
     then
@@ -379,13 +392,60 @@ function cmd_aws_remove_dns_record
 }
 EOF
 
-    aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+    eval $CMD_AWS_REMOVE_DNS_RECORD
 }
-# Groups part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+cmds_GROUP="list-groups list-groups-for-user"
 
-cmds_Groups="list-groups-for-user list-attached-group-policies"
+function help_list_groups
+{
+    echo "List iam groups."
+}
 
-## groups ########################################################
+function cmd_list_groups_pre
+{
+    printf "CLOUD\tNAME\t\n"
+}
+
+function help_list_groups_for_user
+{
+    echo "List groups to which a user belongs."
+}
+function summarize_aws_group
+{
+    JSON="$1"
+    NAME=$(echo "$JSON" | jq -jr '.GroupName')
+    printf "aws\t$NAME\t\n"
+}
+
+CMD_AWS_LIST_GROUPS=' aws iam list-groups'
+function cmd_aws_list_groups
+{
+    $CMD_AWS_LIST_GROUPS | jq -c '.Groups[]' | while IFS=$"\n" read -r info; do summarize_aws_group "$info" ; done
+}
+function summarize_azure_group
+{
+    JSON="$1"
+    NAME=$(echo "$JSON" | jq -jr '.GroupName')
+    printf "azure\t$NAME\t\n"
+}
+
+CMD_AZURE_LIST_GROUPS='az ad group list'
+function cmd_aws_list_groups
+{
+    $CMD_AZURE_LIST_GROUPS | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_azure_group "$info" ; done
+}
+function summarize_gcloud_group
+{
+    JSON="$1"
+    NAME=$(echo "$JSON" | jq -jr '.GroupName')
+    printf "gcloud\t$NAME\t\n"
+}
+
+CMDx_GCLOUD_LIST_GROUPS='gcloud iam list-grantable-roles'
+function cmdx_gcloud_list_groups
+{
+    $CMD_GCLOUD_LIST_GROUPS | jq -c '.[]' | while IFS=$"\n" read -r info; do summarize_azure_group "$info" ; done
+}
 cmds_CLI="install"
 
 function help_install
@@ -883,7 +943,6 @@ function cmd_aws_show_vm {
 }
 
 CMD_AWS_LIST_VMS="aws ec2 describe-instances"
-
 function cmd_aws_list_vms {
     $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
 }
@@ -1208,44 +1267,98 @@ done
 case $output in
     terminal)
         pre_group="$blue"
-        post_group="$normal"
+        post_group="$normal
+"
         pre_cmd="$red"
-        post_cmd="$normal"
+        post_cmd="$normal "
+        pre_help=""
+        post_help="
+"
         pre_cloud="$green"
-        post_cloud="$normal"
-    ;;
-    ascii);;
+        post_cloud="$normal
+"
+        ;;
+    ascii)
+        pre_group=""
+        post_group="
+"
+        pre_cmd=""
+        post_cmd=" "
+        pre_help=""
+        post_help="
+"
+        pre_cloud=""
+        post_cloud="
+"
+        ;;
     man)
         pre_group=".SH "
-        post_group=""
-        pre_cmd="\fB"
-        post_cmd="\fR"
+        post_group="
+"
+        pre_cmd="\\fB"
+        post_cmd="\\fR"
+        pre_help=" "
+        post_help="
+.br"
         pre_cloud='
 ·'
-        post_cloud=""
-    ;;
-    htmq) ;;
-    tex) ;;
+        post_cloud="
+.br
+"
+        ;;
+    htmq)
+        pre_group="h2='"
+        post_group="' ""
+"
+        pre_cmd="cmd='"
+        post_cmd="' "
+        pre_help="help=' "
+        post_help="' br
+"
+        pre_cloud="pre(class=cloud)='"
+        post_cloud="'
+"
+        ;;
+    tex)
+        pre_group="{\\large "
+        post_group="}\\par
+"
+        pre_cmd="\\cmd{"
+        post_cmd="} "
+        pre_help="\\help{"
+        post_help="}
+"
+        pre_cloud="\\cloud{"
+        post_cloud="}
+"
+        ;;
 esac
+
 
 if [ "$list_help" = true ]
 then
-    for i in $all_cmd_groups
+    for group in $all_cmd_groups
     do
-        echo "${pre_group}${i#*_}${post_group}"
-        tmp="$(eval echo $i)"
-        for j in $tmp
+        echo -n "${pre_group}${group#*_}${post_group}"
+        tmp="$(eval echo $group)"
+        for cmd in $tmp
         do
-            helpfunc="help_$(echo "$j" | sed 's/-/_/g')"
-            cmdfuncmatch="cmd_.*_$(echo "$j" | sed 's/-/_/g')"
+            helpfunc="help_$(echo "$cmd" | sed 's/-/_/g')"
+            cmdfuncmatch="cmd_.*_$(echo "$cmd" | sed 's/-/_/g')"
             if [ "$(type -t $helpfunc)" = "function" ]
             then
                 # This picks the first cloud implementation and extracts the arguments from there.
-                arguments=" $(sed -n '/'$cmdfuncmatch'/,/^\}$/{p;/^\}/q}' moln  | grep '="\$[1-9]"' | tr -d ' ' | cut -f 1 -d '=' | tr '\n' ' ')"
-                echo "${pre_cmd}$j$arguments${post_cmd}$(eval $helpfunc | head -n 1)"
+                arguments="$(sed -n '/'$cmdfuncmatch'/,/^\}$/{p;/^\}/q}' moln  | grep '="\$[1-9]"' | tr -d ' ' | cut -f 1 -d '=' | tr '\n' ' ')"
+                arguments=$(echo $arguments | sed 's/^[ \t]*//;s/[ \t]*$//')
+                if [ -n "$arguments" ]
+                then
+                    arguments=" $arguments"
+                fi
+                help=$(eval $helpfunc | head -n 1)
+                echo -n "${pre_cmd}$cmd$arguments${post_cmd}${pre_help}${help}${post_help}"
                 for cloud in aws azure gcloud
                 do
-                    cmdvar="cmd_${cloud}_$(echo "$j" | sed 's/-/_/g')"
+                    cmdvar="cmd_${cloud}_$(echo "$cmd" | sed 's/-/_/g')"
                     cmdvar=$(echo $cmdvar | tr 'a-z' 'A-Z')
                     body=$(eval echo "\$$cmdvar")
                     if [ -n "$body" ]
@@ -1254,10 +1367,10 @@ then
                         if [ "$output" = "terminal" ] || [ "$output" = "ascii" ]
                         then
                             tabs 8
-                            echo "$body" | fold -s -w 80  | sed -e "s|^|\t|g"
+                            echo -n "$body" | fold -s -w 80  | sed -e "s|^|\t|g"
                             tabs -8
                         else
-                            echo "$body"
+                            echo -n "$body"
                         fi
                         echo -n "$post_cloud"
                     fi

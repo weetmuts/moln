@@ -1,5 +1,16 @@
-# Groups part of moln. Copyright (C) 2022 Fredrik Öhrström license spdx: MIT
+cmds_GROUP="list-groups list-groups-for-user"
 
-cmds_Groups="list-groups-for-user list-attached-group-policies"
+function help_list_groups
+{
+    echo "List iam groups."
+}
 
-## groups ########################################################
+function cmd_list_groups_pre
+{
+    printf "CLOUD\tNAME\t\n"
+}
+
+function help_list_groups_for_user
+{
+    echo "List groups to which a user belongs."
+}

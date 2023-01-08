@@ -57,81 +57,132 @@ Create a subshell, within which you have access to a different role to gain priv
 \fB\-d\fR debug with a lot of information.
 .br
 .SH BASIC
-\fBwhoami \fRDisplay active account/identity.
-
+\fBwhoami\fR Display active account/identity.
+.br
 ·aws sts get-caller-identity
+.br
 
 ·az account list
+.br
 
 ·gcloud config list
+.br
 
 .SH BUCKET
-\fBlist-buckets \fRList storage buckets, ie aws s3/gcloud storage/azure blobs.
-
+\fBlist-buckets\fR List storage buckets, ie aws s3/gcloud storage/azure blobs.
+.br
 ·aws s3api list-buckets --output json
+.br
 
 .SH COST
-\fBlist-costs \fRPrint a summary of monthly costs for the last 12 months.
-
+\fBlist-costs\fR Print a summary of monthly costs for the last 12 months.
+.br
 .SH DNS
-\fBlist-hosted-zones \fRList zones the dns is configured to serve.
-\fBlist-dns-records \fRList dns records in a zone.
-\fBlist-domains \fRList dns domains.
+\fBlist-hosted-zones\fR List zones the dns is configured to serve.
+.br
+·aws route53 --region us-east-1 list-hosted-zones
+.br
+\fBlist-dns-records\fR List dns records in a zone.
+.br
+·aws route53 list-resource-record-sets --hosted-zone-id=${ID}
+.br
+\fBupsert-dns-record NAME TYPE DEST\fR Insert or update a dns record.
+.br
+·aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+.br
+\fBremove-dns-record NAME\fR Remove a dns record.
+.br
+·aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}
+.br
+\fBlist-domains\fR List dns domains.
+.br
+·aws route53domains --region us-east-1 list-domains
+.br
 
-.SH Groups
+.SH GROUP
+\fBlist-groups\fR List iam groups.
+.br
+·aws iam list-groups
+.br
 
+·az ad group list
+.br
+\fBlist-groups-for-user\fR List groups to which a user belongs.
+.br
 .SH CLI
-\fBinstall \fRInstall the specified cloud cli.
-
+\fBinstall\fR Install the specified cloud cli.
+.br
 .SH IP
-\fBlist-ips \fRList allocated external ip numbers.
-
+\fBlist-ips\fR List allocated external ip numbers.
+.br
 ·aws ec2 describe-addresses
+.br
 
-.SH Policies
+.SH POLICY
+\fBlist-policies\fR List iam policies.
+.br
+·aws iam list-policies
+.br
 
 .SH ROLE
+\fBassume-role ROLE SESSION\fR Start a subshell with the rights of the assumed role.
+.br
+·aws sts assume-role --role-arn "arn:aws:iam::${AWS_ACCOUNT}:role/$ROLE" --role-session-name "$SESSION"
+.br
+\fBlist-roles\fR List iam roles.
+.br
+·aws iam list-roles
+.br
 
 .SH SUBNET
-\fBlist-subnets \fRList all subnets.
-
+\fBlist-subnets\fR List all subnets.
+.br
 ·aws ec2 describe-subnets
+.br
 
 .SH USER
-\fBlist-users \fRList users in cloud account.
-
+\fBlist-users\fR List users in cloud account.
+.br
 ·aws iam list-users
+.br
 
 ·az ad user list
+.br
 
 ·gcloud iam service-accounts --format=json list
+.br
 
 .SH VM
-\fBcreate-vm-from-template NAME TEMPLATE_NAME \fRCreate a virtual machine based on an existing vm template.
-
+\fBcreate-vm-from-template NAME TEMPLATE_NAME\fR Create a virtual machine based on an existing vm template.
+.br
 ·aws ec2 run-instances --launch-template LaunchTemplateName=${TEMPLATE_NAME} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]"
+.br
 
 ·az foo bar ${TEMPLATE_NAME} ${NAME}
-\fBdestroy-vm NAMEID NAMEID \fRDestroy a virtual machine.
-
+.br
+\fBdestroy-vm NAMEID NAMEID\fR Destroy a virtual machine.
+.br
 .SH VPC
-\fBlist-vpcs \fRList virtual private clouds/networks, aka vpc:s and vnets.
-
+\fBlist-vpcs\fR List virtual private clouds/networks, aka vpc:s and vnets.
+.br
 ·aws ec2 describe-vpcs
+.br
 
 ·az network vnet list
+.br
 
 .SH WEBAPI
-\fBlist-webapi-domains \fRList domain names mapped to web apis (REST/HTTPs) routers.
-
+\fBlist-webapi-domains\fR List domain names mapped to web apis (REST/HTTPs) routers.
+.br
 ·aws apigatewayv2 get-domain-names
+.br
 
 
 .SH AUTHOR
 Written by Fredrik Öhrström.
 
 .SH COPYRIGHT
-Copyright \(co 2022 Fredrik Öhrström.
+Copyright \(co 2022-2023 Fredrik Öhrström.
 .br
 License MIT
 .br
