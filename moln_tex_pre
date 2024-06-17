@@ -4,7 +4,7 @@
 
 \newcommand{\cmd}[1]{\textcolor{Red}{#1}}
 \newcommand{\help}[1]{#1\par}
-\newcommand{\cloud}[1]{\textcolor{Green}{#1}}
+\newcommand{\cloud}[1]{\textcolor{Green}{#1}\\}
 
 \begin{document}
 \tt

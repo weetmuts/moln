@@ -3,10 +3,10 @@
 #############################################################
 
 # Extract all commands from the above set of command categories by parsing this file.
-all_cmds="$(eval echo $(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/'))"
+all_cmds="$(eval echo $(grep -a ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/'))"
 
 # Extract all command groups.
-all_cmd_groups="$(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
+all_cmd_groups="$(grep -a ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
 
 # Now check the cloud selected, or all of them.
 all_clouds="all aws azure gcloud"
@@ -19,6 +19,22 @@ then
     output=terminal
 else
     output=ascii
+fi
+
+if ! command -v xmq &> /dev/null
+then
+    echo "You need to install xmq before using moln. https://libxmq.org"
+    exit 1
+fi
+
+LAST_ARG="${@: -1}"
+OUTPUT_TRANSFORM="transform $TMP_DIR/transforms/textify.xslq to-text"
+OUTPUT_CMD="true"
+
+if [ "$LAST_ARG" = "browse" ] || [ "$LAST_ARG" = "br" ]
+then
+    OUTPUT_TRANSFORM="to-html > /tmp/moln_browse.html"
+    OUTPUT_CMD="firefox /tmp/moln_browse.html"
 fi
 
 while :

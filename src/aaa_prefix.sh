@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2022-2023 Fredrik Öhrström (spdx: MIT)
+# Copyright (C) 2022-2024 Fredrik Öhrström (spdx: MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,14 @@
 MOLN=$(realpath $0)
 verbose=false
 debug=false
+
+TMP_DIR=`mktemp -d`
+function cleanup()
+{
+    rm -rf $TMP_DIR
+}
+
+trap cleanup EXIT
 
 if [ -z "$AWS_ACCOUNT" ]
 then
@@ -107,4 +115,14 @@ function debug
     then
         >2 echo "$@"
     fi
+}
+
+
+function extract_transforms
+{
+    local OFFSET
+    OFF=$(grep --byte-offset --only-matching --text '#TRANSFORMS' $MOLN | cut -f 1 -d : | tail -n 1)
+    let OFFSET=OFF+12
+    dd bs=1 skip=$OFFSET count=100000 if=$MOLN of=$TMP_DIR/transforms.tgz 2>/dev/null
+    tar xzf $TMP_DIR/transforms.tgz -C "$TMP_DIR"
 }

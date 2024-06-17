@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2022-2023 Fredrik Ã–hrstrÃ¶m (spdx: MIT)
+# Copyright (C) 2022-2024 Fredrik Ã–hrstrÃ¶m (spdx: MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,14 @@
 MOLN=$(realpath $0)
 verbose=false
 debug=false
+
+TMP_DIR=`mktemp -d`
+function cleanup()
+{
+    rm -rf $TMP_DIR
+}
+
+trap cleanup EXIT
 
 if [ -z "$AWS_ACCOUNT" ]
 then
@@ -107,6 +115,16 @@ function debug
     then
         >2 echo "$@"
     fi
+}
+
+
+function extract_transforms
+{
+    local OFFSET
+    OFF=$(grep --byte-offset --only-matching --text '#TRANSFORMS' $MOLN | cut -f 1 -d : | tail -n 1)
+    let OFFSET=OFF+12
+    dd bs=1 skip=$OFFSET count=100000 if=$MOLN of=$TMP_DIR/transforms.tgz 2>/dev/null
+    tar xzf $TMP_DIR/transforms.tgz -C "$TMP_DIR"
 }
 cmds_BASIC="whoami"
 
@@ -577,6 +595,31 @@ function cmd_aws_list_ips
 {
     $CMD_AWS_LIST_IPS | jq -c '.Addresses[]' | while IFS=$"\n" read -r info; do summarize_aws_ip "$info" ; done
 }
+# Copyright (C) 2024 Fredrik Ã–hrstrÃ¶m license spdx: MIT
+
+cmds_ORG="\
+ list-accounts\
+"
+
+function cmd_list_accounts
+{
+    echo "List organization accounts."
+}
+
+function cmd_list_accounts_pre {
+    true
+}
+
+CMD_AWS_LIST_ACCOUNTS="aws organizations list-accounts"
+function cmd_aws_list_accounts {
+    extract_transforms
+    >&2 printf "Fetching accounts..."
+    $CMD_AWS_LIST_ACCOUNTS > $TMP_DIR/list_accounts.json
+    >&2 printf "\33[2K\r"
+    CMD="cat $TMP_DIR/list_accounts.json | xmq transform --stringparam=current-date=$(date +%Y-%m-%d) $TMP_DIR/transforms/summarize_aws_account.xslq $OUTPUT_TRANSFORM"
+    eval "$CMD"
+    eval "$OUTPUT_CMD"
+}
 cmds_POLICY="list-policies"
 
 function help_list_policies
@@ -944,7 +987,9 @@ function cmd_aws_show_vm {
 
 CMD_AWS_LIST_VMS="aws ec2 describe-instances"
 function cmd_aws_list_vms {
-    $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+    #    $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+
+    aws ec2 describe-instances | xmq transform --stringparam=current-date=$(date +%Y-%m-%d) transforms/summarize_aws_vms.xslq transform transforms/textify.xslq to-text
 }
 
 function cmd_aws_ssh_to_vm
@@ -1166,10 +1211,10 @@ function cmd_aws_list_webapi_domains
 #############################################################
 
 # Extract all commands from the above set of command categories by parsing this file.
-all_cmds="$(eval echo $(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/'))"
+all_cmds="$(eval echo $(grep -a ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/'))"
 
 # Extract all command groups.
-all_cmd_groups="$(grep ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
+all_cmd_groups="$(grep -a ^cmds_ "$MOLN" | sed 's/\([^=]*\)=.*/\$\1/')"
 
 # Now check the cloud selected, or all of them.
 all_clouds="all aws azure gcloud"
@@ -1182,6 +1227,22 @@ then
     output=terminal
 else
     output=ascii
+fi
+
+if ! command -v xmq &> /dev/null
+then
+    echo "You need to install xmq before using moln. https://libxmq.org"
+    exit 1
+fi
+
+LAST_ARG="${@: -1}"
+OUTPUT_TRANSFORM="transform $TMP_DIR/transforms/textify.xslq to-text"
+OUTPUT_CMD="true"
+
+if [ "$LAST_ARG" = "browse" ] || [ "$LAST_ARG" = "br" ]
+then
+    OUTPUT_TRANSFORM="to-html > /tmp/moln_browse.html"
+    OUTPUT_CMD="firefox /tmp/moln_browse.html"
 fi
 
 while :
@@ -1467,3 +1528,10 @@ else
         fi
     ) | eval $postfunc
 fi
+exit 0
+#TRANSFORMS
+‹      íXİsâ6Ï3…f)ö%`c(dxÈ´y`&wÍ4éMß2ÂàüQIÜ”ÿ½+ói°q“ó]ææ¼<`´Òoµì—wÃ>ŸÌãÚÅ×"¨×³ä·Ñ³ôÃï-]®Ù1ÚºeÀºağ…¬¯v£Š¸À¡‹	#s?çî+â§$ööç‘çaæşCğ‚?Í=ŞZrúw	2¤»İNı»†nHû·-«§w¬6Ø¿×•ö×K]H?¸ıÁÄ.bJøŒ¡Ì	ãnà#„†Èhé5”¦¥G}>€3À	4m±X´f+`SÍè÷ûÚŸwÚãÖ©ÔÚs!¥„˜aOñ±Gà°1F|Ñt° ên‹ ^HaEñ°°g°M[ów÷˜	üL–v–€ ¡1œ=£I Ò&Øsi<@^à<Ä6A«ãs; ŠBì8®? +\^o5)™ˆ2ˆ·_bît¶];ƒÉ¾˜5í™K…Ì‰¯¢ç1¶?OYùNÓhÀèİ¤-?×«F
+(»VëD’ÀcJ”Dù!¨ÎÂ< ®ƒŒp‰Æ„5ÔŒsëÛå0¦4Ç/w¿ıñëù-o>ÜßqÏÜ9Øøü¦×·¶ŒîÏğ3YÙ†‘‡ÃÆÍ­ûq…JlB´ß	'.QÁµ'mäC¾€»Á³š	—ÿ&¡0±A>â©Dü„iDnŠ8$CA–%–bn_úW¶¨S}V9³~ZÕò#íD¯½'~!2â5 hœsØÌCgÿûÃÿG-ùAÀoí#¤¢WáÎ¡J&q¶IfbF|´¿Ã‘oÏİcğ¼Ó4Ù/2÷g;“D±1¥;ÕvYS;’Í¿"êbÒkü/]¸¥Rù:&P$w*6x4æ‚c*u©ü•qÕQÙ’ò1!C çƒv¯Ú/—ÚÏ-
+§­ĞcúÁâ»´Üa.İ‚)ğ²-™/Å¢bšÁdŸ!u°*j¢ú>:¡n6ä¥JÎr›r8
+o‡ÎËÍt÷Ñ˜ºv!x~}(ôÏı…N^ò¤ë©ùìÄ{Îğ)v:òä;*Îvª½'4˜¢iÌµDä¸sd¤œ&<.¯'Áu‰:?ëºÄÇ…^!ä:¦.á‚è= ¬Ù8ùNİUFË%Újk™ò°+íµº–
+ÏõVÍ®µÛ’ÙQAJjÅĞuõd—\ƒÛ´¡GÛè¹ª­joİÀTôEtĞÿËOw—Õõï© ÿ×{¦µŸÿtåüÇ²Ú½ªÿÿôâş°nœ‡(dIgtÒ¥}ÉŒ ˆD	Å#b8òÍ\ò%ã³µP“ÃM6ÎZÒ&«¹Eo‡tBìE…óïa…kÔ‹dœİKûé]ÿº ´vjı¯Üœ;ÿÃ¶D¾(#Ä»c˜›ø‡ğ7JŒÙ®âÿ[P5ÿË¡jş—f–6ÿ»ıp3º+íeyÕüîfÇJ˜×ÉyÑ›ÏéÕyû1İ«Çh¹ˆ·vi¹#§¨õ­:™Š*ª¨¢Š*ª¨¢Š~ ú1xc (  

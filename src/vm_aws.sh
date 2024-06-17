@@ -166,7 +166,9 @@ function cmd_aws_show_vm {
 
 CMD_AWS_LIST_VMS="aws ec2 describe-instances"
 function cmd_aws_list_vms {
-    $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+    #    $CMD_AWS_LIST_VMS | jq -c '.Reservations[].Instances[]' | while IFS=$"\n" read -r info; do summarize_aws_vm "$info" ; done
+
+    aws ec2 describe-instances | xmq transform --stringparam=current-date=$(date +%Y-%m-%d) transforms/summarize_aws_vms.xslq transform transforms/textify.xslq to-text
 }
 
 function cmd_aws_ssh_to_vm
