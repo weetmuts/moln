@@ -21,12 +21,6 @@ else
     output=ascii
 fi
 
-if ! command -v xmq &> /dev/null
-then
-    echo "You need to install xmq before using moln. https://libxmq.org"
-    exit 1
-fi
-
 LAST_ARG="${@: -1}"
 OUTPUT_TRANSFORM="transform $TMP_DIR/transforms/textify.xslq to-text"
 OUTPUT_CMD="true"

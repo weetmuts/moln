@@ -22,6 +22,18 @@
 #
 
 MOLN=$(realpath $0)
+XMQ=$(dirname $MOLN)/xmq
+
+if ! command -v $XMQ &> /dev/null
+then
+    XMQ=xmq
+    if ! command -v $XMQ &> /dev/null
+    then
+        echo "You need to install xmq before using moln. https://libxmq.org"
+        exit 1
+    fi
+fi
+
 verbose=false
 debug=false
 

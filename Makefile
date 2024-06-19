@@ -59,9 +59,15 @@ moln.pdf: moln.tex
 	@xelatex -interaction=batchmode  -halt-on-error moln.tex
 	@echo "Built moln.pdf"
 
-test:
+test: xmq
 	@./tests/test_basics.sh
 	@if [ "$(CREDENTIALS_EXIST)" = "true" ]; then ./tests/test_with_credentials.sh ; fi
+
+xmq:
+	@mkdir -p build
+	@(cd build; git clone --depth 1 https://github.com/libxmq/xmq.git)
+	@(cd build/xmq; ./configure; make)
+	@cp build/xmq/build/x86_64-pc-linux-gnu/release/xmq .
 
 install:
 	install moln $(PREFIX)/bin

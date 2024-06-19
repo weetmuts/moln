@@ -18,5 +18,44 @@ After you have prepared (for example) a vm template, then you can start it with 
 <pre>moln all list-vms</pre>
 <pre>moln aws assume-role allaccess MYSESSION3</pre>
 <pre>moln --list-help</pre>
+<h2>BASIC</h2>
+<cmd>whoami</cmd><help> Display active account/identity.</help><br><pre class="cloud">aws sts get-caller-identity</pre>
+<pre class="cloud">az account list</pre>
+<pre class="cloud">gcloud config list</pre>
+<h2>BUCKET</h2>
+<cmd>list-buckets</cmd><help> List storage buckets, ie aws s3/gcloud storage/azure blobs.</help><br><pre class="cloud">aws s3api list-buckets --output json</pre>
+<h2>COST</h2>
+<cmd>list-costs</cmd><help> Print a summary of monthly costs for the last 12 months.</help><br><h2>DNS</h2>
+<cmd>list-hosted-zones</cmd><help> List zones the dns is configured to serve.</help><br><pre class="cloud">aws route53 --region us-east-1 list-hosted-zones</pre>
+<cmd>list-dns-records</cmd><help> List dns records in a zone.</help><br><pre class="cloud">aws route53 list-resource-record-sets --hosted-zone-id=${ID}</pre>
+<cmd>upsert-dns-record NAME TYPE DEST</cmd><help> Insert or update a dns record.</help><br><pre class="cloud">aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}</pre>
+<cmd>remove-dns-record NAME</cmd><help> Remove a dns record.</help><br><pre class="cloud">aws route53 change-resource-record-sets --hosted-zone-id ${ID} --change-batch file://${FILE}</pre>
+<cmd>list-domains</cmd><help> List dns domains.</help><br><pre class="cloud">aws route53domains --region us-east-1 list-domains</pre>
+<h2>GROUP</h2>
+<cmd>list-groups</cmd><help> List iam groups.</help><br><pre class="cloud">aws iam list-groups</pre>
+<pre class="cloud">az ad group list</pre>
+<cmd>list-groups-for-user</cmd><help> List groups to which a user belongs.</help><br><h2>CLI</h2>
+<cmd>install</cmd><help> Install the specified cloud cli.</help><br><h2>IP</h2>
+<cmd>list-ips</cmd><help> List allocated external ip numbers.</help><br><pre class="cloud">aws ec2 describe-addresses</pre>
+<h2>ORG</h2>
+<h2>POLICY</h2>
+<cmd>list-policies</cmd><help> List iam policies.</help><br><pre class="cloud">aws iam list-policies</pre>
+<h2>ROLE</h2>
+<cmd>assume-role ROLE SESSION</cmd><help> Start a subshell with the rights of the assumed role.</help><br><pre class="cloud">aws sts assume-role --role-arn "arn:aws:iam::${AWS_ACCOUNT}:role/$ROLE" --role-session-name "$SESSION"</pre>
+<cmd>list-roles</cmd><help> List iam roles.</help><br><pre class="cloud">aws iam list-roles</pre>
+<h2>SUBNET</h2>
+<cmd>list-subnets</cmd><help> List all subnets.</help><br><pre class="cloud">aws ec2 describe-subnets</pre>
+<h2>USER</h2>
+<cmd>list-users</cmd><help> List users in cloud account.</help><br><pre class="cloud">aws iam list-users</pre>
+<pre class="cloud">az ad user list</pre>
+<pre class="cloud">gcloud iam service-accounts --format=json list</pre>
+<h2>VM</h2>
+<cmd>create-vm-from-template NAME TEMPLATE_NAME</cmd><help> Create a virtual machine based on an existing vm template.</help><br><pre class="cloud">aws ec2 run-instances --launch-template LaunchTemplateName=${TEMPLATE_NAME} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${NAME}}]"</pre>
+<pre class="cloud">az foo bar ${TEMPLATE_NAME} ${NAME}</pre>
+<cmd>destroy-vm NAMEID NAMEID</cmd><help> Destroy a virtual machine.</help><br><h2>VPC</h2>
+<cmd>list-vpcs</cmd><help> List virtual private clouds/networks, aka vpc:s and vnets.</help><br><pre class="cloud">aws ec2 describe-vpcs</pre>
+<pre class="cloud">az network vnet list</pre>
+<h2>WEBAPI</h2>
+<cmd>list-webapi-domains</cmd><help> List domain names mapped to web apis (REST/HTTPs) routers.</help><br><pre class="cloud">aws apigatewayv2 get-domain-names</pre>
 </body>
 </html>

@@ -22,6 +22,18 @@
 #
 
 MOLN=$(realpath $0)
+XMQ=$(dirname $MOLN)/xmq
+
+if ! command -v $XMQ &> /dev/null
+then
+    XMQ=xmq
+    if ! command -v $XMQ &> /dev/null
+    then
+        echo "You need to install xmq before using moln. https://libxmq.org"
+        exit 1
+    fi
+fi
+
 verbose=false
 debug=false
 
@@ -1229,12 +1241,6 @@ else
     output=ascii
 fi
 
-if ! command -v xmq &> /dev/null
-then
-    echo "You need to install xmq before using moln. https://libxmq.org"
-    exit 1
-fi
-
 LAST_ARG="${@: -1}"
 OUTPUT_TRANSFORM="transform $TMP_DIR/transforms/textify.xslq to-text"
 OUTPUT_CMD="true"
@@ -1530,8 +1536,6 @@ else
 fi
 exit 0
 #TRANSFORMS
-‹      íXÝsâ6Ï3…fŽ)ö%`c(dxÈ´y`&wÍ4éMß2ÂàžüQIÜ”ÿ½+ói°q“ó]ææ¼<`´Òoµì—wÃ>ŸÌãÚÅ×"¨×³ä·Ñ³ôÃï-]®Ù1ÚºeÀºað…¬¯v£Š¸À¡‹	#s?çî+â§$ööç‘çaæþCžð‚?Í=ÞZrúw	2¤»ÝNžý»†nHû·-«§w¬6Ø¿×•ö×K]H?¸ýÁÄ.bJøŒ¡Ì	ãnà#„†Èhé5”¦¥G}>€3Àž	4m±X´f+`SÍè÷ûÚŸwÚãÖ©ÔÚs!¥„˜aOñ±Gà°1F|Ñt° ên‹ ^HaEñ°°g°M[óžw÷˜	üL–vŽ–€ ¡1œ=£I Ò&Øsi<@^à<Ä6A«ãs; ŠBì8®? +\^o5)™ˆ2ˆ·_bît¶];ƒÉ¾˜5í™K…Ì‰¯¢ç1¶?OYùNÓhÀèÝ¤-?×«F
-(»VëD’ÀcJ”Dù!¨ÎÂ< ®ƒŒp‰Æ„5ÔŒsëÛå0¦4Ç/w¿ýñëù-o>ÜžßqÏÜ9Øøü¦×·¶ŒîÏð3YÙ†‘Ž‡ÃÆÍ­ûq…JlBž´ß	'.QÁµ'mäC¾€»Á³š	—ÿ&¡0±A>â©Dü„iDnŠ8$CA–%–bn_úW¶¨S}V9³~ZÕò#íD¯½'~!2â5 hœsØÌCgÿûÃÿG-ùAÀoí#¤¢WáÎ¡J&q¶IfbF|´¿Ã‘oÏÝcð¼Ó4Ù/2÷g;“D±1¥;ÕvYS;’Í¿"êbÒkü/]¸¥Rù:&P$w*6x4æ‚c*u©ü•qÕQÙ’ò1!C çƒv¯Ú/—ÚÏ-
-§­ÐcúÁâ»´Üa.Ý‚)ð²-™/Å¢bšÁdŸ!u°*j¢ú>:¡n6ä¥JÎr›r8
-o‡ÎËÍt÷Ñ˜ºv!x~}(ôÏý…N^ò¤ë©ùìÄ{Îð)v:òä;*Îvª½'4˜¢iÌµDä¸sd¤œ&<.¯'Áu‰:?ëºÄÇ…^!ä:¦.á‚è= ¬Ù8ùNÝUFË%Újk™ò°+íµº–
-ÏõVÍ®µÛ’ÙQAJjÅÐuõd—\ƒÛ´¡GÛè¹ª­joÝÀTôEtÐÿËOw—Õõï© ÿ×{¦µŸÿtåüÇ²Ú½ªÿÿôâþ°nœ‡(dIgtÒ¥}ÉŒ ˆD	Å#b8òÍ\ò%ã³µP“ÃM6ÎZÒ&«¹Eo‡tBìE…óïa…kÔ‹dœÝKûé]ÿº ´vjý¯Üœ;ÿÃ¶D¾(#Ä»c˜›ø‡ð7JŒÙ®âÿ[P5ÿË¡jþ—f–6ÿ»ýp3º+íeyÕüîfÇJ˜×ÉyÑ›ÏéŽÕyû1Ý«Çh¹ˆ·vi¹#§¨õ­:™Š*ª¨¢Š*ª¨¢Š~ ú1xc (  
+‹      íXYsâFæ™_1UK)6è AÀÅƒ+ñUÞ+°©¼¹i eGGfFqøïéæH(öjíÚŠÚÝ3_O«Q·`ØçÓ€y\«|+Òº]Kþ7º–~üG£ÝiµM³mvÌŠn´Ó¨ ë›èˆ".0C¨2eÄaî—Ìuyòï”ÄÁÿ<ò<ÌÜ¿É#^òÇ…Ç›+Nÿ*@‡tp§ÓÎòÇÐéÓ²ºzÛ’þï¯‚ôtçÒÿÜÿàâ>kJøœ¡,ãnà#„ÈhêU”¤•G}Þ‡= žö5m¹\6—­fÀfšÑëõ´?F÷ÚxTjõ)†ZBÌ°§øØ#°ÙŽ#¾h8Xu¿D/¤ÀQ<,ì9,Ó¶²§ý9æÂ£G?cÁÎ	(¶	ê“ÀY£'4@Û{.]÷‘ø±MÐætßž€¢;ŽëÏúÈ
+W7»_J¦¢âXÌÍw¼˜¬ï‹yÃž»ÔQÈ‚ø*zš`ûËŒ‘ï4ì€¬>LMùw³©'€’°[³Î4	<¡D‰€éÌ!¬Ïê:ÈWhBAY]MÙ·=]† Jwü|ÿëç_./ùtûñîòŠæ.ÀÇ—\ßÎY2|¸ O¥;FCºnìÂ+œPbPò¨ýF8ap`È
+®=jCêœžÕT¸ìW§ZÀÄ3ú`ŒgñwL#‚ pC¬C2d%Pì¹æ6ñe|¥«:·g“1Û§M5;ÓÎì:Øq"%ßP.K›ºéâ»?~?j¡È#¿µOPŠ^…»€[2Î³çb&æÄG{ð{ùö|ìž‚gí¦ñz‘º>=˜$Š)Ý›¶¯ª˜Ú‘d4þŒ¨‹}(¯ë×DéÒ…*•¨×k—äÞÄ:&\0L¥&¿6®Ûj=]S6&TaHälÐÎµùrP°dÙ ½lÐ¼tÚ)=u ,¿KÏßÁ…{0^´'à…xJL#˜*D½^ET;d'Ü›uy¨‚«Üóu8o‡Î‹­tÑ„ºv.xöýŸ‡}äÉÐS³Åqô\Ç*âdæÉoTœT?Ni0E1ÚÒ™[ÈqÈHM:ø:¼'×jÿ¤ëçBz¹Ûœº‚¢`[õ³×p®2[®ÐÎZ«%7{À1·æZ*<×ÖÀmu¬ýB`Ha[-	Ž¡ëêÙ*ÉƒÓ˜Ð£=Û¹©nªïÝÀ”ôUtÔÿËOwº.ªë?PNÿ¯w[Övþc˜ºÕ¾aYf·ìÿß‚^Üÿ÷·ó …,îŒÎº´¯™‘#¡xDÌG~YCH¾d<pñ.Ôäð@“³·Éjæ¥·Ç?Ù¡	ö"Âùçø†«Wótí=hûáCï&ç*hîÍúOµ9sþ‡m;ˆ|QD5ÈÉ³£·’ó_¸b $”ùÿTÎÿ2¨œÿ%……Íÿî>ÞïsF{9JFãÛñçQq3¾Ûm­+`¦'gJï>Ë;5çýGy¯µe"ÞyØ¥ÅBâ§ŒQnË]vP%•TRI%•TRI%½!ýÝ/” (  
