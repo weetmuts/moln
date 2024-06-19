@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - id: CHECKOUT_SOURCE
-    - uses: actions/checkout@v3
+      uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
       run: sudo apt install -y eatmydata libtidy-dev libxml2-dev libxslt1-dev unzip jq
     - id: CONFIGURE
