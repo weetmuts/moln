@@ -11,8 +11,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - id: CHECKOUT_SOURCE
+    - uses: actions/checkout@v3
+    - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
+      run: sudo apt install -y eatmydata libtidy-dev libxml2-dev libxslt1-dev unzip jq
+    - id: CONFIGURE
+      run: eatmydata ./configure
     - id: MAKE
-      run: make
+      run: eatmydata make
     - id: TEST
-      run: make test
+      run: eatmydata make test
