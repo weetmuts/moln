@@ -1,0 +1,90 @@
+xsl:stylesheet(version   = 1.0
+               xmlns:xsl = http://www.w3.org/1999/XSL/Transform)
+{
+    xsl:param(name = current-date)
+    xsl:template(match = /)
+    {
+        html {
+            head {
+               style = 'body { font-family: monospace }
+                        td { padding: 5px; padding-left: 1em; padding-right: 1em; }
+                        tr:nth-child(even) {background-color: #f2f2f2;}'
+            }
+            body {
+                table(style='border:solid 1px black') {
+                    tr {
+                        th = CLOUD
+                        th = NAME
+                        th = Private
+                        th = Since
+                        th = IP
+                        th
+                    }
+                    xsl:apply-templates(select = _/Reservations/_/Instances/_)
+                    {
+                        xsl:sort(select=Tags/_/Value data-type=text order=ascending)
+                    }
+                }
+            }
+        }
+    }
+
+    xsl:template(match = Instances/_)
+    {
+        tr {
+            td {
+                'aws'
+            }
+            td {
+                xsl:apply-templates(select = Tags/_/Value)
+            }
+            td {
+                xsl:apply-templates(select = State/Name)
+            }
+            td {
+                xsl:variable(name = then select = LaunchTime)
+                xsl:variable(name = launchtime)
+                {
+                    xsl:call-template(name = calculate-julian-day)
+                    {
+                        xsl:with-param(name = year select = 'substring($then,1,4)')
+                        xsl:with-param(name = month select = 'substring($then,6,2)')
+                        xsl:with-param(name = day   select = 'substring($then,9,2)')
+                    }
+                }
+                xsl:variable(name = now)
+                {
+                    xsl:call-template(name = calculate-julian-day)
+                    {
+                        xsl:with-param(name = year select = 'substring($current-date,1,4)')
+                        xsl:with-param(name = month select = 'substring($current-date,6,2)')
+                        xsl:with-param(name = day   select = 'substring($current-date,9,2)')
+                    }
+                }
+                xsl:value-of(select = '$now - $launchtime') ' days'
+            }
+            td {
+                xsl:apply-templates(select = PrivateIpAddress)
+            }
+            td {
+                xsl:apply-templates(select = PublicIpAddress)
+            }
+        }
+    }
+
+    xsl:template(name = calculate-julian-day)
+    {
+        xsl:param(name = year)
+        xsl:param(name = month)
+        xsl:param(name = day)
+
+        xsl:variable(name   = a
+                     select = 'floor((14 - $month) div 12)')
+        xsl:variable(name   = y
+                     select = '$year + 4800 - $a')
+        xsl:variable(name   = m
+                     select = '$month + 12 * $a - 3')
+
+        xsl:value-of(select = '$day + floor((153 * $m + 2) div 5) + $y * 365 + floor($y div 4) - floor($y div 100) + floor($y div 400) - 32045')
+    }
+}

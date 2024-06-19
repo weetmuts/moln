@@ -1,0 +1,51 @@
+xsl:stylesheet(version   = 1.0
+               xmlns:xsl = http://www.w3.org/1999/XSL/Transform)
+{
+    xsl:param(name = current-date)
+    xsl:template(match = /)
+    {
+        html {
+            head {
+               style = 'body { font-family: monospace }
+                        td { padding: 5px; padding-left: 1em; padding-right: 1em; }
+                        tr:nth-child(even) {background-color: #f2f2f2;}'
+            }
+            body {
+                table(style='border:solid 1px black') {
+                    tr {
+                        th = CLOUD
+                        th = NAME
+                        th = EMAIL
+                        th = ID
+                        th = STATUS
+                    }
+                    xsl:apply-templates(select = _/Accounts/_)
+                    {
+                        xsl:sort(select=Name data-type=text order=ascending)
+                    }
+                }
+            }
+        }
+    }
+
+    xsl:template(match = Accounts/_)
+    {
+        tr {
+            td {
+                'aws'
+            }
+            td {
+                xsl:apply-templates(select = Name)
+            }
+            td {
+                xsl:apply-templates(select = Email)
+            }
+            td {
+                xsl:apply-templates(select = Id)
+            }
+            td {
+                xsl:apply-templates(select = Status)
+            }
+        }
+    }
+}
