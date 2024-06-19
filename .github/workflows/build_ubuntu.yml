@@ -14,7 +14,10 @@ jobs:
     - id: CHECKOUT_SOURCE
       uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: sudo apt install -y eatmydata libtidy-dev libxml2-dev libxslt1-dev unzip jq texlive-xetex
+      run: |
+        sudo apt-get install -y eatmydata
+        sudo eatmydata apt-get update -y
+        sudo eatmydata sudo apt-get install -y eatmydata libtidy-dev libxml2-dev libxslt1-dev unzip jq texlive-xetex
     - id: CONFIGURE
       run: eatmydata ./configure
     - id: MAKE
