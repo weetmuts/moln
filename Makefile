@@ -40,11 +40,11 @@ moln.1: moln moln_1_pre moln_1_post
 	@cat moln_1_post >> moln.1
 	@echo "Built moln.1"
 
-moln.html: moln moln_htmq_pre moln_htmq_post
+moln.html: moln moln_htmq_pre moln_htmq_post xmq
 	@cp moln_htmq_pre moln.htmq
 	@./moln --output=htmq --list-help >> moln.htmq
 	@cat moln_htmq_post >> moln.htmq
-	@xmq moln.htmq to-html > moln.html
+	@./xmq moln.htmq to-html > moln.html
 	@echo "Built moln.html"
 
 moln.tex: moln moln_tex_pre moln_tex_post
